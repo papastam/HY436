@@ -9,9 +9,7 @@ import time
 import random
 import json # addition to read configuration from file
 
-
 class SimpleLoadBalancer(object):
-
     
     # initialize SimpleLoadBalancer class instance
     def __init__(self, lb_mac = None, service_ip = None, 
@@ -21,7 +19,11 @@ class SimpleLoadBalancer(object):
         core.openflow.addListeners(self) 
 
         # set class parameters
-        # write your code here!!!
+        self.lb_mac = lb_mac
+        self.service_ip = service_ip
+        self.server_ips = server_ips
+        self.user_ip_to_group = user_ip_to_group
+        self.server_ip_to_group = server_ip_to_group
         pass
 
 
@@ -29,6 +31,7 @@ class SimpleLoadBalancer(object):
     def _handle_ConnectionUp(self, event):
         self.connection = event.connection
         # write your code here!!!
+
         pass
 
 
@@ -47,6 +50,19 @@ class SimpleLoadBalancer(object):
     # send ARP request "proxied" by the controller (so that the controller learns about another machine in network)
     def send_proxied_arp_request(self, connection, ip):
         # write your code here!!!
+        r = arp()
+        r.hwtype = r.HW_TYPE_ETHERNET
+        r.prototype = r.PROTO_TYPE_IP
+        r.hwlen = 6
+        r.protolen = r.protolen
+        r.opcode = r.REQUEST
+        r.hwdst = ETHER_BROADCAST
+        r.protodst = ip
+        r.hwsrc = self.service_ip
+        # r.protosrc = packet.next.srcip
+        e = ethernet(type=ethernet.ARP_TYPE, src=packet.src,
+                     dst=ETHER_BROADCAST)
+        e.set_payload(r)
         pass
 
     
