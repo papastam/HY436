@@ -9,6 +9,8 @@ import time
 import random
 import json # addition to read configuration from file
 
+from pox.lib.packet.ethernet import ethernet, ETHER_BROADCAST
+
 class SimpleLoadBalancer(object):
     
     # initialize SimpleLoadBalancer class instance
@@ -31,7 +33,17 @@ class SimpleLoadBalancer(object):
     def _handle_ConnectionUp(self, event):
         self.connection = event.connection
         # write your code here!!!
+        log.info("Switch %s has come up." % (event.connection))
+        
+        for(ip, group) in self.user_ip_to_group.items():
+            self.send_proxied_arp_request(event.connection, ip)
 
+        log.info("Sent ARP requests to all hosts")
+
+        for(ip, group) in self.server_ip_to_group.items():
+            self.send_proxied_arp_request(event.connection, ip)
+        
+        log.info("Sent ARP requests to all servers")
         pass
 
 
@@ -44,6 +56,18 @@ class SimpleLoadBalancer(object):
     # send ARP reply "proxied" by the controller (on behalf of another machine in network)
     def send_proxied_arp_reply(self, packet, connection, outport, requested_mac):
         # write your code here!!!
+        #craft arp reply
+        # r = arp()
+        # r.hwtype    = r.HW_TYPE_ETHERNET
+        # r.prototype = r.PROTO_TYPE_IP
+        # r.hwlen     = 6
+        # r.protolen  = r.protolen
+        # r.opcode    = r.REPLY
+        # r.hwsrc     = self.lb_mac
+        # r.protosrc  = self.service_ip
+        # r.hwdst     = 
+        # r.protodst  = connection.
+
         pass
 
 
@@ -51,18 +75,26 @@ class SimpleLoadBalancer(object):
     def send_proxied_arp_request(self, connection, ip):
         # write your code here!!!
         r = arp()
-        r.hwtype = r.HW_TYPE_ETHERNET
+        r.hwtype    = r.HW_TYPE_ETHERNET
         r.prototype = r.PROTO_TYPE_IP
-        r.hwlen = 6
-        r.protolen = r.protolen
-        r.opcode = r.REQUEST
-        r.hwdst = ETHER_BROADCAST
-        r.protodst = ip
-        r.hwsrc = self.service_ip
-        # r.protosrc = packet.next.srcip
-        e = ethernet(type=ethernet.ARP_TYPE, src=packet.src,
-                     dst=ETHER_BROADCAST)
+        r.hwlen     = 6
+        r.protolen  = r.protolen
+        r.opcode    = r.REQUEST
+        r.hwsrc     = self.lb_mac
+        r.protosrc  = self.service_ip
+        r.hwdst     = ETHER_BROADCAST
+        r.protodst  = ip
+
+        e = ethernet(type=ethernet.ARP_TYPE, src=lb_mac, dst=ETHER_BROADCAST)
         e.set_payload(r)
+
+        msg         = of.ofp_packet_out()
+        msg.data    = e.pack()
+        msg.in_port = of.OFPP_NONE
+        msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
+        connection.send(msg)
+        
+        log.info("Sent ARP request to %s" % ip)
         pass
 
     
@@ -85,7 +117,10 @@ class SimpleLoadBalancer(object):
         inport = event.port
 
         if packet.type == packet.ARP_TYPE:
-            # write your code here!!!
+            log.info("Received ARP packet")
+            log.info("ARP packet: %s" % packet.payload)            
+
+
             pass
         elif packet.type == packet.IP_TYPE:
             # write your code here!!!
