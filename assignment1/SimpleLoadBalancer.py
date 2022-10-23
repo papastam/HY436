@@ -12,13 +12,36 @@ import json # addition to read configuration from file
 from pox.lib.packet.ethernet import ethernet, ETHER_BROADCAST
 
 class SimpleLoadBalancer(object):
-    
+    #An ARP table containing the pair (IP, port) for each IP
+    arpTable={}
+
+    #a print function to print the ARP table
+    def print_arp_table(self):
+        print("\n{:^44}".format("Switch ARP table"))
+        print("|{:^15}".format("IP") + "|{:^19}".format("MAC") + "|{:^6}|".format("PORT"))
+        for item in self.arpTable.items():
+            print("+---------------+-------------------+------+")
+            print("|{:^15}".format(item[0]) + "|{:^19}".format(item[1][0]) + "|{:^6}|".format(item[1][1]))
+        print("--------------------------------------------")
+
+    #update the ARP table when a new packet arrives
+    def update_ARP_table(self, ip, mac, inport):
+        if(ip in self.arpTable) and (self.arpTable[ip] == (mac,inport)):
+            log.info("APR entry for IP: %s already exists" % ip)
+        elif (ip in self.arpTable):
+            self.arpTable[ip]=(mac,inport)
+            log.info("ARP entry exists, but got updated! (for IP %s)" % ip)
+        else:
+            self.arpTable[ip]=(mac,inport)
+            log.info("New ARP entry for IP: %s installed" % ip)
+
+
     # initialize SimpleLoadBalancer class instance
     def __init__(self, lb_mac = None, service_ip = None, 
                  server_ips = [], user_ip_to_group = {}, server_ip_to_group = {}):
         
         # add the necessary openflow listeners
-        core.openflow.addListeners(self) 
+        core.openflow.addListeners(self)
 
         # set class parameters
         self.lb_mac = lb_mac
@@ -49,31 +72,41 @@ class SimpleLoadBalancer(object):
 
     # update the load balancing choice for a certain client
     def update_lb_mapping(self, client_ip):
-        # write your code here!!!
+        
         pass
     
 
     # send ARP reply "proxied" by the controller (on behalf of another machine in network)
     def send_proxied_arp_reply(self, packet, connection, outport, requested_mac):
-        # write your code here!!!
         #craft arp reply
-        # r = arp()
-        # r.hwtype    = r.HW_TYPE_ETHERNET
-        # r.prototype = r.PROTO_TYPE_IP
-        # r.hwlen     = 6
-        # r.protolen  = r.protolen
-        # r.opcode    = r.REPLY
-        # r.hwsrc     = self.lb_mac
+        r = arp()
+        r.opcode    = r.REPLY
+        r.hwsrc     = requested_mac
         # r.protosrc  = self.service_ip
-        # r.hwdst     = 
-        # r.protodst  = connection.
+        r.hwdst     = packet.src
+        r.protodst  = packet.payload.protosrc
 
+        if(packet.payload.protosrc in self.server_ip_to_group):
+            r.protosrc = packet.payload.protodst
+        elif(packet.payload.protosrc in self.user_ip_to_group):
+            r.protosrc = self.service_ip 
+
+        #craft ethernet packet
+        e = ethernet(type=ethernet.ARP_TYPE, src=self.lb_mac, dst=packet.payload.hwsrc)
+        e.set_payload(r)
+
+        msg         = of.ofp_packet_out()
+        msg.data    = e.pack()
+        msg.in_port = outport
+        msg.actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
+        connection.send(msg)
+        
+        log.info("Sent ARP reply to %s from %s" % (packet.payload.protosrc,requested_mac))
         pass
 
 
     # send ARP request "proxied" by the controller (so that the controller learns about another machine in network)
     def send_proxied_arp_request(self, connection, ip):
-        # write your code here!!!
         r = arp()
         r.hwtype    = r.HW_TYPE_ETHERNET
         r.prototype = r.PROTO_TYPE_IP
@@ -85,7 +118,7 @@ class SimpleLoadBalancer(object):
         r.hwdst     = ETHER_BROADCAST
         r.protodst  = ip
 
-        e = ethernet(type=ethernet.ARP_TYPE, src=lb_mac, dst=ETHER_BROADCAST)
+        e = ethernet(type=ethernet.ARP_TYPE, src=self.lb_mac, dst=ETHER_BROADCAST)
         e.set_payload(r)
 
         msg         = of.ofp_packet_out()
@@ -117,13 +150,22 @@ class SimpleLoadBalancer(object):
         inport = event.port
 
         if packet.type == packet.ARP_TYPE:
-            log.info("Received ARP packet")
-            log.info("ARP packet: %s" % packet.payload)            
+            if packet.payload.opcode == arp.REQUEST:
 
+                if (packet.payload.protodst == self.service_ip) or (packet.payload.protodst in self.user_ip_to_group):
+                    log.info("Received ARP request for %s from %s" % (packet.payload.protodst, packet.payload.protosrc))
+                    self.send_proxied_arp_reply(packet, connection, inport, self.lb_mac)
 
+            elif packet.payload.opcode == arp.REPLY:
+                log.info("Received ARP reply from %s" % packet.payload.protosrc)
+                if packet.payload.hwdst == self.lb_mac:
+                    log.info("Received ARP reply for service IP from %s" % packet.payload.protosrc)
+                    self.update_ARP_table(packet.payload.protosrc, packet.payload.hwsrc, inport)
+                    self.print_arp_table()
             pass
         elif packet.type == packet.IP_TYPE:
             # write your code here!!!
+            log.info("Recieved IP packet: %s" % packet.payload)
             pass
         else:
             log.info("Unknown Packet type: %s" % packet.type)
