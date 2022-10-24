@@ -11,9 +11,45 @@ import json # addition to read configuration from file
 
 from pox.lib.packet.ethernet import ethernet, ETHER_BROADCAST
 
+class bcolors:
+    BLUE        = '\033[94m'
+    RED         = '\033[31m'
+    GREEN       = '\033[92m'
+    ENDC        = '\033[0m'
+    UNDERLINE   = '\033[4m'
+
+
 class SimpleLoadBalancer(object):
     #An ARP table containing the pair (IP, port) for each IP
     arpTable={}
+
+    #A colofuul way to display ips
+    def ip_wcolor(self,ip):
+        returnstr = ""
+
+        if ip in self.user_ip_to_group:
+            returnstr = bcolors.ENDC
+            if self.user_ip_to_group[ip] == "red":
+                returnstr += bcolors.RED
+            else:
+                returnstr += bcolors.BLUE
+
+        elif ip in self.server_ip_to_group:
+            returnstr = bcolors.UNDERLINE
+            if self.server_ip_to_group[ip] == "red":
+                returnstr += bcolors.RED
+            else:
+                returnstr += bcolors.BLUE
+
+        elif ip == self.service_ip:
+            returnstr = bcolors.UNDERLINE + bcolors.GREEN
+
+        else:
+            returnstr = bcolors.ENDC + bcolors.ENDC
+
+        returnstr += str(ip) + bcolors.ENDC
+        return returnstr
+
 
     #a print function to print the ARP table
     def print_arp_table(self):
@@ -21,7 +57,7 @@ class SimpleLoadBalancer(object):
         print("|{:^15}".format("IP") + "|{:^19}".format("MAC") + "|{:^6}|".format("PORT"))
         for item in self.arpTable.items():
             print("+---------------+-------------------+------+")
-            print("|{:^15}".format(item[0]) + "|{:^19}".format(item[1][0]) + "|{:^6}|".format(item[1][1]))
+            print("|{:^28}".format(self.ip_wcolor(item[0])) + "|{:^19}".format(item[1][0]) + "|{:^6}|".format(item[1][1]))
         print("--------------------------------------------")
 
     #update the ARP table when a new packet arrives
@@ -166,6 +202,8 @@ class SimpleLoadBalancer(object):
         elif packet.type == packet.IP_TYPE:
             # write your code here!!!
             log.info("Recieved IP packet: %s" % packet.payload)
+            
+            
             pass
         else:
             log.info("Unknown Packet type: %s" % packet.type)
