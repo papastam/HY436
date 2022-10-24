@@ -23,6 +23,13 @@ class SimpleLoadBalancer(object):
     #An ARP table containing the pair (IP, port) for each IP
     arpTable={}
 
+    lb_choise={
+        IPAddr("10.0.0.1"):IPAddr("10.0.0.5"),
+        IPAddr("10.0.0.2"):IPAddr("10.0.0.6"),
+        IPAddr("10.0.0.3"):IPAddr("10.0.0.7"),
+        IPAddr("10.0.0.4"):IPAddr("10.0.0.8")
+        }
+
     #A colofuul way to display ips
     def ip_wcolor(self,ip):
         returnstr = ""
@@ -108,7 +115,21 @@ class SimpleLoadBalancer(object):
 
     # update the load balancing choice for a certain client
     def update_lb_mapping(self, client_ip):
+        choise = random.randint(0,1)
+
+        if(str(client_ip)[-1]=="1") or (str(client_ip)[-1]=="2"):
+            choise += 5
+        elif(str(client_ip)[-1]=="3") or (str(client_ip)[-1]=="4"):
+            choise += 7
+        else: #imposible case
+            print(bcolors.RED + "The impossible has happend in update_lb_mapping!" + bcolors.ENDC)
         
+        if(choise == 5): self.lb_choise[client_ip]=IPAddr("10.0.0.5")  
+        elif(choise == 6): self.lb_choise[client_ip]=IPAddr("10.0.0.6")
+        elif(choise == 7): self.lb_choise[client_ip]=IPAddr("10.0.0.7")
+        elif(choise == 8): self.lb_choise[client_ip]=IPAddr("10.0.0.8")  
+            
+
         pass
     
 
@@ -170,12 +191,26 @@ class SimpleLoadBalancer(object):
     # install flow rule from a certain client to a certain server
     def install_flow_rule_client_to_server(self, connection, outport, client_ip, server_ip, buffer_id=of.NO_BUFFER):
         # write your code here!!!
+        
+        msg = of.ofp_flow_mod()
+        # msg.priority = 42
+
+        # msg.match.dl_type = 0x800
+        msg.match.nw_dst = self.service_ip
+        msg.match.nw_src = client_ip
+
+        msg.buffer_id = buffer_id
+
+        msg.actions.append(of.ofp_action_output(port = outport))
+        msg.actions.append(of.ofp_action_nw_addr.set_dst(self.lb_choise[client_ip]))
+        connection.send(msg)
+        
+        log.info(bcolors.GREEN + "Updated flow table for client %s" % self.ip_wcolor(client_ip)  )
         pass
 
 
     # install flow rule from a certain server to a certain client
     def install_flow_rule_server_to_client(self, connection, outport, server_ip, client_ip, buffer_id=of.NO_BUFFER):
-        # write your code here!!!
         pass
 
 
@@ -200,10 +235,16 @@ class SimpleLoadBalancer(object):
                     self.print_arp_table()
             pass
         elif packet.type == packet.IP_TYPE:
-            # write your code here!!!
             log.info("Recieved IP packet: %s" % packet.payload)
-            
-            
+
+            if (packet.next.srcip in self.user_ip_to_group):
+                self.update_lb_mapping(packet.next.srcip)
+                destination_from_arp = self.arpTable[self.lb_choise[packet.next.srcip]]
+                log.info("%s -> %s (%s)" %(self.ip_wcolor(packet.next.srcip), self.ip_wcolor(packet.next.dstip), packet.next.buffer_id))
+
+                # self.install_flow_rule_client_to_server(connection, destination_from_arp[1], packet.next.srcip, self.lb_choise(packet.next.srcip),)
+
+
             pass
         else:
             log.info("Unknown Packet type: %s" % packet.type)
