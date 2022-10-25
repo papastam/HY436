@@ -18,6 +18,8 @@ class bcolors:
     ENDC        = '\033[0m'
     UNDERLINE   = '\033[4m'
 
+FLOW_IDLE_TIMEOUT = 10
+FLOW_HARD_TIMEOUT = 10
 
 class SimpleLoadBalancer(object):
     #An ARP table containing the pair (IP, port) for each IP
@@ -191,26 +193,49 @@ class SimpleLoadBalancer(object):
     # install flow rule from a certain client to a certain server
     def install_flow_rule_client_to_server(self, connection, outport, client_ip, server_ip, buffer_id=of.NO_BUFFER):
         # write your code here!!!
-        
+        self.update_lb_mapping(client_ip)
+        chosen_server_ip = self.lb_choise[client_ip]
+
         msg = of.ofp_flow_mod()
         # msg.priority = 42
 
         # msg.match.dl_type = 0x800
+        msg.idle_timeout=FLOW_IDLE_TIMEOUT
+        msg.hard_timeout=FLOW_HARD_TIMEOUT
         msg.match.nw_dst = self.service_ip
         msg.match.nw_src = client_ip
 
         msg.buffer_id = buffer_id
 
+        msg.actions.append(of.ofp_action_nw_addr.set_dst(chosen_server_ip))
         msg.actions.append(of.ofp_action_output(port = outport))
-        msg.actions.append(of.ofp_action_nw_addr.set_dst(self.lb_choise[client_ip]))
         connection.send(msg)
         
-        log.info(bcolors.GREEN + "Updated flow table for client %s" % self.ip_wcolor(client_ip)  )
+        log.info(bcolors.GREEN + "Updated flow table for client %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
         pass
 
 
     # install flow rule from a certain server to a certain client
     def install_flow_rule_server_to_client(self, connection, outport, server_ip, client_ip, buffer_id=of.NO_BUFFER):
+        chosen_server_ip = self.lb_choise[client_ip]
+
+        msg = of.ofp_flow_mod()
+        # msg.priority = 42
+
+        # msg.match.dl_type = 0x800
+        msg.idle_timeout=FLOW_IDLE_TIMEOUT
+        msg.hard_timeout=FLOW_HARD_TIMEOUT
+        msg.match.nw_dst = self.service_ip
+        msg.match.nw_src = client_ip
+
+        msg.buffer_id = buffer_id
+
+        msg.actions.append(of.ofp_action_nw_addr.set_dst(chosen_server_ip))
+        msg.actions.append(of.ofp_action_output(port = outport))
+        connection.send(msg)
+        
+        log.info(bcolors.GREEN + "Updated flow table for client %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
+        
         pass
 
 
@@ -238,12 +263,13 @@ class SimpleLoadBalancer(object):
             log.info("Recieved IP packet: %s" % packet.payload)
 
             if (packet.next.srcip in self.user_ip_to_group):
-                self.update_lb_mapping(packet.next.srcip)
                 destination_from_arp = self.arpTable[self.lb_choise[packet.next.srcip]]
-                log.info("%s -> %s (%s)" %(self.ip_wcolor(packet.next.srcip), self.ip_wcolor(packet.next.dstip), packet.next.buffer_id))
+                # log.info("%s -> %s (%s)" %(self.ip_wcolor(packet.next.srcip), self.ip_wcolor(packet.next.dstip), event.ofp.buffer_id))
 
-                # self.install_flow_rule_client_to_server(connection, destination_from_arp[1], packet.next.srcip, self.lb_choise(packet.next.srcip),)
+                self.install_flow_rule_client_to_server(connection, destination_from_arp[1], packet.next.srcip, self.lb_choise[packet.next.srcip],event.ofp.buffer_id)
 
+            elif (packet.next.srcip in self.server_ip_to_group):
+                log.info("Server response")
 
             pass
         else:
