@@ -1,3 +1,4 @@
+from turtle import color
 from pox.core import core
 from pox.openflow import *
 import pox.openflow.libopenflow_01 as of
@@ -74,13 +75,13 @@ class SimpleLoadBalancer(object):
     #update the ARP table when a new packet arrives
     def update_ARP_table(self, ip, mac, inport):
         if(ip in self.arpTable) and (self.arpTable[ip] == (mac,inport)):
-            log.info("APR entry for IP: %s already exists" % ip)
+            log.info(colors.yellow + "APR entry for IP: " + self.ip_wcolor(ip) + colors.yellow + " already exists" + colors.reset)
         elif (ip in self.arpTable):
             self.arpTable[ip]=(mac,inport)
-            log.info("ARP entry exists, but got updated! (for IP %s)" % ip)
+            log.info(colors.yellow + "ARP entry exists, but got updated! (for IP " + self.ip_wcolor(ip) + colors.yellow + ")" + colors.reset)
         else:
             self.arpTable[ip]=(mac,inport)
-            log.info("New ARP entry for IP: %s installed" % ip)
+            log.info(colors.yellow + "New ARP entry for IP: " + self.ip_wcolor(ip) + colors.yellow + " installed" + colors.reset)
 
 
     # initialize SimpleLoadBalancer class instance
@@ -109,7 +110,6 @@ class SimpleLoadBalancer(object):
             self.send_proxied_arp_request(event.connection, ip)
 
         log.info("Sent ARP requests to all hosts")
-        # self.install_flow_rule_arp_to_controller(event.connection)
 
         for(ip, group) in self.server_ip_to_group.items():
             self.send_proxied_arp_request(event.connection, ip)
@@ -144,7 +144,6 @@ class SimpleLoadBalancer(object):
         r = arp()
         r.opcode    = r.REPLY
         r.hwsrc     = requested_mac
-        # r.protosrc  = self.service_ip
         r.hwdst     = packet.src
         r.protodst  = packet.payload.protosrc
 
@@ -163,7 +162,7 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
         connection.send(msg)
         
-        log.info("Sent ARP reply to %s from %s" % (packet.payload.protosrc,requested_mac))
+        log.info(color.yellow + "Sent ARP reply to " + self.ip_wcolor(packet.payload.protosrc) + colors.yellow + " from " + requested_mac + colors.reset)
         pass
 
 
@@ -189,21 +188,8 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
         connection.send(msg)
         
-        log.info("Sent ARP request to %s" % ip)
-        pass
-
-    def install_flow_rule_arp_to_controller(self, connection):
-        
-        msg = of.ofp_flow_mod()
-        msg.hard_timeout=of.OFP_FLOW_PERMANENT
-        
-        msg.match.dl_type = 0x0806
-
-        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-        connection.send(msg)
-        
-        log.info(colors.green + "Updated flow table for client %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
-        
+        log.info(colors.yellow + "Sent ARP request to " + ip + colors.reset)
+        pass  
     
     # install flow rule from a certain client to a certain server
     def install_flow_rule_client_to_server(self, connection, outport, client_ip, server_ip, buffer_id=of.NO_BUFFER):
@@ -214,7 +200,6 @@ class SimpleLoadBalancer(object):
         chosen_server_port = self.arpTable[chosen_server_ip][1]
 
         msg = of.ofp_flow_mod()
-        # msg.priority = 42
 
         msg.idle_timeout=FLOW_IDLE_TIMEOUT
         msg.hard_timeout=FLOW_HARD_TIMEOUT
@@ -232,14 +217,13 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port = chosen_server_port))
         connection.send(msg)
         
-        log.info(colors.green + "Updated flow table for client %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
+        log.info(colors.green + "Installed flow for route %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
         pass
 
 
     # install flow rule from a certain server to a certain client
     def install_flow_rule_server_to_client(self, connection, outport, server_ip, client_ip, buffer_id=of.NO_BUFFER):
         msg = of.ofp_flow_mod()
-        # msg.priority = 42
 
         # msg.idle_timeout=of.OFP_FLOW_PERMANENT
         # msg.hard_timeout=of.OFP_FLOW_PERMANENT
@@ -257,7 +241,7 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port = outport))
         connection.send(msg)
         
-        log.info(colors.green + "Updated flow table for server %s -> %s" %(self.ip_wcolor(server_ip), self.ip_wcolor(client_ip))  )
+        log.info(colors.green + "Installed flow for route %s -> %s" %(self.ip_wcolor(server_ip), self.ip_wcolor(client_ip))  )
         
         pass
 
@@ -272,13 +256,13 @@ class SimpleLoadBalancer(object):
             if packet.payload.opcode == arp.REQUEST:
 
                 if (packet.payload.protodst == self.service_ip) or (packet.payload.protodst in self.user_ip_to_group):
-                    log.info("Received ARP request for %s from %s" % (packet.payload.protodst, packet.payload.protosrc))
+                    log.info(colors.yellow + "Received ARP request for %s from %s" + colors.reset % (packet.payload.protodst, packet.payload.protosrc))
                     self.send_proxied_arp_reply(packet, connection, inport, self.lb_mac)
 
             elif packet.payload.opcode == arp.REPLY:
                 log.info("Received ARP reply from %s" % packet.payload.protosrc)
                 if packet.payload.hwdst == self.lb_mac:
-                    log.info("Received ARP reply for service IP from %s" % packet.payload.protosrc)
+                    log.info(colors.yellow + "Received ARP reply for "+ colors.green +" service IP "+colors.yellow+" from %s" + colors.reset % packet.payload.protosrc)
                     self.update_ARP_table(packet.payload.protosrc, packet.payload.hwsrc, inport)
                     self.print_arp_table()
             pass
