@@ -24,7 +24,6 @@ class colors:
 
 
 FLOW_IDLE_TIMEOUT = 10
-FLOW_HARD_TIMEOUT = 10
 
 class SimpleLoadBalancer(object):
     #An ARP table containing the pair (IP, port) for each IP
@@ -229,7 +228,7 @@ class SimpleLoadBalancer(object):
         msg = of.ofp_flow_mod()
 
         msg.idle_timeout=FLOW_IDLE_TIMEOUT
-        msg.hard_timeout=FLOW_HARD_TIMEOUT
+        # msg.hard_timeout=FLOW_HARD_TIMEOUT
         
         msg.match.dl_type = 0x0800
         msg.match.nw_proto = 1
