@@ -199,9 +199,12 @@ class SimpleLoadBalancer(object):
         msg = of.ofp_flow_mod()
         # msg.priority = 42
 
-        # msg.match.dl_type = 0x800
         msg.idle_timeout=FLOW_IDLE_TIMEOUT
         msg.hard_timeout=FLOW_HARD_TIMEOUT
+        
+        msg.match.dl_type = 0x0800
+        msg.match.nw_proto = 1
+        
         msg.match.nw_dst = self.service_ip
         msg.match.nw_src = client_ip
 
@@ -222,9 +225,12 @@ class SimpleLoadBalancer(object):
         msg = of.ofp_flow_mod()
         # msg.priority = 42
 
-        # msg.match.dl_type = 0x800
         msg.idle_timeout=FLOW_IDLE_TIMEOUT
         msg.hard_timeout=FLOW_HARD_TIMEOUT
+        
+        msg.match.dl_type = 0x0800
+        msg.match.nw_proto = 1
+
         msg.match.nw_dst = self.service_ip
         msg.match.nw_src = client_ip
 
