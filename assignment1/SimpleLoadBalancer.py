@@ -1,3 +1,4 @@
+from cgitb import reset
 from turtle import color
 from pox.core import core
 from pox.openflow import *
@@ -17,6 +18,7 @@ class colors:
     blue        = '\033[94m'
     red         = '\033[31m'
     green       = '\033[92m'
+    purple      = '\033[35m'
     reset       = '\033[00m'
     underline   = '\033[04m'
 
@@ -34,6 +36,31 @@ class SimpleLoadBalancer(object):
         IPAddr("10.0.0.3"):IPAddr("10.0.0.7"),
         IPAddr("10.0.0.4"):IPAddr("10.0.0.8")
         }
+
+    def mac_wcolor(self,mac):
+        returnstr = ""
+        lastint = int(str(mac)[-1])
+
+        if mac == self.lb_mac:
+            returnstr += colors.reset
+            returnstr += colors.green
+        elif lastint < 5 and lastint > 0: 
+            returnstr += colors.reset
+            if lastint < 3:
+                returnstr += colors.red
+            else:
+                returnstr += colors.blue
+        elif lastint >= 5 and lastint < 9: 
+            returnstr += colors.underline
+            if lastint < 7:
+                returnstr += colors.red
+            else:
+                returnstr += colors.blue
+        else:
+            returnstr += colors.reset + colors.reset
+
+        returnstr += str(mac) + colors.reset
+        return returnstr
 
     #A colofuul way to display ips
     def ip_wcolor(self,ip):
@@ -69,7 +96,7 @@ class SimpleLoadBalancer(object):
         print("|{:^15}".format("IP") + "|{:^19}".format("MAC") + "|{:^6}|".format("PORT"))
         for item in self.arpTable.items():
             print("+---------------+-------------------+------+")
-            print("|{:^28}".format(self.ip_wcolor(item[0])) + "|{:^19}".format(item[1][0]) + "|{:^6}|".format(item[1][1]))
+            print("|{:^30}".format(self.ip_wcolor(item[0])) + "|{:^34}".format(self.mac_wcolor(item[1][0])) + "|{:^6}|".format(item[1][1]))
         print("--------------------------------------------")
 
     #update the ARP table when a new packet arrives
@@ -104,17 +131,17 @@ class SimpleLoadBalancer(object):
     def _handle_ConnectionUp(self, event):
         self.connection = event.connection
         # write your code here!!!
-        log.info("Switch %s has come up." % (event.connection))
+        log.info(colors.purple+"Switch " + str(event.connection) + " has come up."+colors.reset )
         
         for(ip, group) in self.user_ip_to_group.items():
             self.send_proxied_arp_request(event.connection, ip)
 
-        log.info("Sent ARP requests to all hosts")
+        log.info(colors.purple+"Sent ARP requests to all hosts"+colors.reset)
 
         for(ip, group) in self.server_ip_to_group.items():
             self.send_proxied_arp_request(event.connection, ip)
         
-        log.info("Sent ARP requests to all servers")
+        log.info(colors.purple+"Sent ARP requests to all servers"+colors.reset)
         pass
 
 
@@ -162,7 +189,7 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
         connection.send(msg)
         
-        log.info(color.yellow + "Sent ARP reply to " + self.ip_wcolor(packet.payload.protosrc) + colors.yellow + " from " + requested_mac + colors.reset)
+        log.info(colors.yellow + "Sent ARP reply to " + self.ip_wcolor(packet.payload.protosrc) + colors.yellow + " from " + self.mac_wcolor(requested_mac) + colors.reset)
         pass
 
 
@@ -188,7 +215,7 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
         connection.send(msg)
         
-        log.info(colors.yellow + "Sent ARP request to " + ip + colors.reset)
+        log.info(colors.yellow + "Sent ARP request to " + self.ip_wcolor(ip) + colors.reset)
         pass  
     
     # install flow rule from a certain client to a certain server
@@ -217,6 +244,7 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port = chosen_server_port))
         connection.send(msg)
         
+        log.info("")
         log.info(colors.green + "Installed flow for route %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
         pass
 
@@ -241,6 +269,7 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port = outport))
         connection.send(msg)
         
+        log.info("")
         log.info(colors.green + "Installed flow for route %s -> %s" %(self.ip_wcolor(server_ip), self.ip_wcolor(client_ip))  )
         
         pass
@@ -256,13 +285,13 @@ class SimpleLoadBalancer(object):
             if packet.payload.opcode == arp.REQUEST:
 
                 if (packet.payload.protodst == self.service_ip) or (packet.payload.protodst in self.user_ip_to_group):
-                    log.info(colors.yellow + "Received ARP request for %s from %s" + colors.reset % (packet.payload.protodst, packet.payload.protosrc))
+                    log.info("")
+                    log.info(colors.yellow + "Received ARP request for " + self.ip_wcolor(packet.payload.protodst) + colors.yellow + " from " + self.ip_wcolor(packet.payload.protosrc))
                     self.send_proxied_arp_reply(packet, connection, inport, self.lb_mac)
 
             elif packet.payload.opcode == arp.REPLY:
-                log.info("Received ARP reply from %s" % packet.payload.protosrc)
+                log.info(colors.yellow + "Received ARP reply for "+ colors.green +"service IP"+colors.yellow+" from " + self.ip_wcolor(packet.payload.protosrc) + colors.reset)
                 if packet.payload.hwdst == self.lb_mac:
-                    log.info(colors.yellow + "Received ARP reply for "+ colors.green +" service IP "+colors.yellow+" from %s" + colors.reset % packet.payload.protosrc)
                     self.update_ARP_table(packet.payload.protosrc, packet.payload.hwsrc, inport)
                     self.print_arp_table()
             pass
@@ -274,7 +303,6 @@ class SimpleLoadBalancer(object):
                 self.install_flow_rule_client_to_server(connection, destination_from_arp[1], packet.next.srcip, self.lb_choise[packet.next.srcip],event.ofp.buffer_id)
 
             elif (packet.next.srcip in self.server_ip_to_group):
-                log.info("Server response")
                 destination_from_arp = self.arpTable[packet.next.dstip]
 
                 self.install_flow_rule_server_to_client(connection, destination_from_arp[1], packet.next.srcip, packet.next.dstip, event.ofp.buffer_id)
