@@ -11,12 +11,14 @@ import json # addition to read configuration from file
 
 from pox.lib.packet.ethernet import ethernet, ETHER_BROADCAST
 
-class bcolors:
-    BLUE        = '\033[94m'
-    RED         = '\033[31m'
-    GREEN       = '\033[92m'
-    ENDC        = '\033[0m'
-    UNDERLINE   = '\033[4m'
+class colors:
+    yellow      = "\033[93m"
+    blue        = '\033[94m'
+    red         = '\033[31m'
+    green       = '\033[92m'
+    reset       = '\033[00m'
+    underline   = '\033[04m'
+
 
 FLOW_IDLE_TIMEOUT = 10
 FLOW_HARD_TIMEOUT = 10
@@ -37,26 +39,26 @@ class SimpleLoadBalancer(object):
         returnstr = ""
 
         if ip in self.user_ip_to_group:
-            returnstr = bcolors.ENDC
+            returnstr = colors.reset
             if self.user_ip_to_group[ip] == "red":
-                returnstr += bcolors.RED
+                returnstr += colors.red
             else:
-                returnstr += bcolors.BLUE
+                returnstr += colors.blue
 
         elif ip in self.server_ip_to_group:
-            returnstr = bcolors.UNDERLINE
+            returnstr = colors.underline
             if self.server_ip_to_group[ip] == "red":
-                returnstr += bcolors.RED
+                returnstr += colors.red
             else:
-                returnstr += bcolors.BLUE
+                returnstr += colors.blue
 
         elif ip == self.service_ip:
-            returnstr = bcolors.UNDERLINE + bcolors.GREEN
+            returnstr = colors.underline + colors.green
 
         else:
-            returnstr = bcolors.ENDC + bcolors.ENDC
+            returnstr = colors.reset + colors.reset
 
-        returnstr += str(ip) + bcolors.ENDC
+        returnstr += str(ip) + colors.reset
         return returnstr
 
 
@@ -125,7 +127,7 @@ class SimpleLoadBalancer(object):
         elif(str(client_ip)[-1]=="3") or (str(client_ip)[-1]=="4"):
             choise += 7
         else: #imposible case
-            print(bcolors.RED + "The impossible has happend in update_lb_mapping!" + bcolors.ENDC)
+            print(colors.red + "The impossible has happend in update_lb_mapping!" + colors.reset)
         
         if(choise == 5): self.lb_choise[client_ip]=IPAddr("10.0.0.5")  
         elif(choise == 6): self.lb_choise[client_ip]=IPAddr("10.0.0.6")
@@ -200,7 +202,7 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
         connection.send(msg)
         
-        log.info(bcolors.GREEN + "Updated flow table for client %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
+        log.info(colors.green + "Updated flow table for client %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
         
     
     # install flow rule from a certain client to a certain server
@@ -230,7 +232,7 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port = chosen_server_port))
         connection.send(msg)
         
-        log.info(bcolors.GREEN + "Updated flow table for client %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
+        log.info(colors.green + "Updated flow table for client %s -> %s" %( self.ip_wcolor(client_ip), self.ip_wcolor(chosen_server_ip))  )
         pass
 
 
@@ -255,7 +257,7 @@ class SimpleLoadBalancer(object):
         msg.actions.append(of.ofp_action_output(port = outport))
         connection.send(msg)
         
-        log.info(bcolors.GREEN + "Updated flow table for server %s -> %s" %(self.ip_wcolor(server_ip), self.ip_wcolor(client_ip))  )
+        log.info(colors.green + "Updated flow table for server %s -> %s" %(self.ip_wcolor(server_ip), self.ip_wcolor(client_ip))  )
         
         pass
 
@@ -281,11 +283,9 @@ class SimpleLoadBalancer(object):
                     self.print_arp_table()
             pass
         elif packet.type == packet.IP_TYPE:
-            log.info("Recieved IP packet: %s" % packet.payload)
 
             if (packet.next.srcip in self.user_ip_to_group):
                 destination_from_arp = self.arpTable[self.lb_choise[packet.next.srcip]]
-                # log.info("%s -> %s (%s)" %(self.ip_wcolor(packet.next.srcip), self.ip_wcolor(packet.next.dstip), event.ofp.buffer_id))
 
                 self.install_flow_rule_client_to_server(connection, destination_from_arp[1], packet.next.srcip, self.lb_choise[packet.next.srcip],event.ofp.buffer_id)
 
@@ -295,9 +295,6 @@ class SimpleLoadBalancer(object):
 
                 self.install_flow_rule_server_to_client(connection, destination_from_arp[1], packet.next.srcip, packet.next.dstip, event.ofp.buffer_id)
             pass
-        else:
-            log.info("Unknown Packet type: %s" % packet.type)
-            return
         return
 
 
