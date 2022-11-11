@@ -13,17 +13,56 @@ import argparse
 import sys
 import time
 
+debug = 1
+
+def debug(message):
+    if debug:
+        print("\033[41mDEBUG:\033[00m\033[93m" + str(message) + "\033[00m")
 
 class ClosTopo(Topo):
+
+    def printTopo(self, cores, fanout):
+        nodespace = (cores*fanout*fanout*fanout/10)+3
+        linespace = cores*fanout*fanout*fanout*nodespace+6
+
+        cstr = ""
+        astr = ""
+        estr = ""
+        hstr = ""
+        
+        for cswitch in self.coreSwArray:
+            cstr += "-" + cswitch
+
+        for aswitch in self.aggrSwArray:
+            astr += "-" + aswitch
+
+        for eswitch in self.edgeSwArray:
+            estr += "-" + eswitch
+
+        for host in self.hostsArray:
+            hstr += host + "-"
+
+        print
+        print("\033[10m\033[32m"+"---CONSTRUCTED TOPOLOGY---".center(linespace+6)+"\033[00m")
+        print("\033[31mCore:\033[00m-" + cstr.center(linespace, '-'))
+        print("      \033[93m"+"[FULL MESH OF LINKS]".center(linespace)+"\033[00m")
+        print("\033[35mAggr:\033[00m-" + astr.center(linespace, '-'))
+        print("      \033[93m"+"[FULL MESH OF LINKS]".center(linespace)+"\033[00m")
+        print("\033[36mEdge:\033[00m-" + estr.center(linespace, '-'))
+        print("      \033[93m"+("[LINKS FROM SW TO %d HOSTS]" % fanout).center(linespace)+"\033[00m")
+        print("\033[94mHost:\033[00m-" + hstr.center(linespace, '-'))
+        print
+
+        pass
 
     def __init__(self, fanout, cores, **opts):
         # Initialize topology and default options
         Topo.__init__(self, **opts)
         
-        coreSwArray =[]
-        aggrSwArray =[]
-        edgeSwArray =[]
-        hostsArray  =[]
+        self.coreSwArray =[]
+        self.aggrSwArray =[]
+        self.edgeSwArray =[]
+        self.hostsArray  =[]
        
         aggregatecnt    = cores * fanout
         edgecnt         = aggregatecnt * fanout
@@ -31,31 +70,40 @@ class ClosTopo(Topo):
 
         #Set up Core and Aggregate level, Connection Core - Aggregation level
         for cnumber in range(cores):
-            coreSwArray.append( Topo.addSwitch(self, "c"+str(cnumber)) )
+            self.coreSwArray.append( Topo.addSwitch(self, "c"+str(cnumber)) )
+            debug("Created Core Switch: c"+str(cnumber))
 
         for anumber in range(aggregatecnt):
-            aggrSwArray.append( Topo.addSwitch(self, "a"+str(anumber)) )
+            self.aggrSwArray.append( Topo.addSwitch(self, "a"+str(anumber)) )
+            debug("Created Aggregate Switch: a"+str(anumber))
         
-        for cswitch in coreSwArray:
-            for aswitch in aggrSwArray:
+        for cswitch in self.coreSwArray:
+            for aswitch in self.aggrSwArray:
                 Topo.addLink( self, cswitch, aswitch )
         pass
 
         #Set up Edge level, Connection Aggregation - Edge level 
         for enumber in range(edgecnt):
-            edgeSwArray.append( Topo.addSwitch(self, "e"+str(enumber)))
+            self.edgeSwArray.append( Topo.addSwitch(self, "e"+str(enumber)))
+            debug("Created Edge Switch: e"+str(enumber))
 
-        for aswitch in aggrSwArray:
-            for eswitch in edgeSwArray:
+        for aswitch in self.aggrSwArray:
+            for eswitch in self.edgeSwArray:
                 Topo.addLink( self, aswitch, eswitch, )
         pass
         
         #Set up Host level, Connection Edge - Host level
         for hostnumber in range(hostscnt):
             newhost = Topo.addHost(self, "h"+str(hostnumber))
-            hostsArray.append( newhost )
+            self.hostsArray.append( newhost )
+            debug("Created Host: h"+str(hostnumber))
 
-            Topo.addLink(self, newhost, edgeSwArray[int(hostnumber/2)])
+            Topo.addLink(self, newhost, self.edgeSwArray[int(hostnumber/fanout)])
+            debug("Created Link: h"+str(hostnumber)+" - e"+str(int(hostnumber/fanout)))
+
+        self.printTopo(cores, fanout)
+
+        debug(self.switches())
         pass
 	
 

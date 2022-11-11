@@ -23,7 +23,8 @@ from pprint import pprint as pp
 
 log = core.getLogger()
 
-MAX_PHYS_PORTS = 0xFF00
+MAX_PHYS_PORTS  = 0xFF00
+ALLOW_SPAM      = 0
 
 # dict of TCP and UDP proto numbers
 PROTO_NUMS = {
@@ -31,6 +32,11 @@ PROTO_NUMS = {
   17: 'udp/other'
 }
 
+def spampp(message):
+    if ALLOW_SPAM == 1:
+        pp(message)
+    else:
+        print("(output disabled to reduce spam)")
 
 class CloudNetController (EventMixin):
 
@@ -230,7 +236,7 @@ class CloudNetController (EventMixin):
                     return
 
             if self._paths_computed:
-                #print "Routing calculations have converged"
+                #print("Routing calculations have converged"
                 log.info("Path requested for flow %s-->%s" % (str(srcip), str(dstip)))
 
                 if dstip in self.arpmap: #I know where to send the packet
@@ -259,7 +265,7 @@ class CloudNetController (EventMixin):
                 else:
                     self.flood_on_all_switch_edges(packet, dpid, inport)
             else:
-                print "Routing calculations have not converged, discarding packet"
+                print("Routing calculations have not converged, discarding packet")
                 return
 
         #--------------------------------------------------------------------------------------------------------------
@@ -352,20 +358,20 @@ class CloudNetController (EventMixin):
             if dpid1 in self.adjs[dpid2]:
                 self.adjs[dpid2].remove(dpid1)
 
-        print "Current switch-to-switch ports:"
-        pp(self.sw_sw_ports)
-        print "Current adjacencies:"
-        pp(self.adjs)
+        print("Current switch-to-switch ports:")
+        spampp(self.sw_sw_ports)
+        print("Current adjacencies:")
+        spampp(self.adjs)
         self._paths_computed=False
         self.checkPaths()
         if self._paths_computed == False:
-            print "Warning: Disjoint topology, Shortest Path Routing converging"
+            print("Warning: Disjoint topology, Shortest Path Routing converging")
         else:
-            print "Topology connected, Shortest paths (re)computed successfully, Routing converged"
-            print "--------------------------"
+            print("Topology connected, Shortest paths (re)computed successfully, Routing converged")
+            print("--------------------------")
             for dpid in self.switches:
                 self.switches[dpid].printPaths()
-            print "--------------------------"
+            print("--------------------------")
 
     def checkPaths(self):
         if not self._paths_computed:
@@ -416,15 +422,15 @@ class SwitchWithPaths (EventMixin):
         for dst in self._paths:
             equal_paths_number = len(self._paths[dst])
             if equal_paths_number > 1:
-                print "There are %i shortest paths from switch %i to switch %i:" % (equal_paths_number, self.dpid, dst)
+                print("There are %i shortest paths from switch %i to switch %i:" % (equal_paths_number, self.dpid, dst))
             else:
-                print "There is exactly one shortest path from switch %i to switch %i:" % (self.dpid, dst)
+                print("There is exactly one shortest path from switch %i to switch %i:" % (self.dpid, dst))
             for proto_num in self._paths_per_proto[dst]:
-                print "---%s (%s) paths---" % (str(PROTO_NUMS[proto_num]), str(proto_num))
+                print("---%s (%s) paths---" % (str(PROTO_NUMS[proto_num]), str(proto_num)))
                 for path in self._paths_per_proto[dst][proto_num]:
                     for u in path:
-                         print "%i," % (u),
-                    print ""
+                         print("%i," % (u),)
+                    print("")
 
 
     def connect(self, connection):
@@ -494,9 +500,21 @@ class SwitchWithPaths (EventMixin):
 
 
 def ShortestPaths(switches, adjs):
-    #WRITE YOUR CODE HERE!
-    pass
+    topograph = nx.Graph()
 
+    for dpid in adjs:
+        topograph.add_node(dpid)
+        for neighbor in adjs.get(dpid):
+            topograph.add_edge(dpid, neighbor)
+
+    try:
+        for switch in switches:
+            for target in switches:
+                switches[switch].appendPaths(target, list(nx.all_shortest_paths(topograph,switch,target)))
+    except nx.NetworkXNoPath:
+        pass
+
+    return True
     
 def str_to_bool(str):
     assert(str in ['True', 'False'])
