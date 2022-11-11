@@ -19,17 +19,43 @@ class ClosTopo(Topo):
     def __init__(self, fanout, cores, **opts):
         # Initialize topology and default options
         Topo.__init__(self, **opts)
+        
+        coreSwArray =[]
+        aggrSwArray =[]
+        edgeSwArray =[]
+        hostsArray  =[]
        
-        "Set up Core and Aggregate level, Connection Core - Aggregation level"
-        #WRITE YOUR CODE HERE!
+        aggregatecnt    = cores * fanout
+        edgecnt         = aggregatecnt * fanout
+        hostscnt        = edgecnt * fanout
+
+        #Set up Core and Aggregate level, Connection Core - Aggregation level
+        for cnumber in range(cores):
+            coreSwArray.append( Topo.addSwitch(self, "c"+str(cnumber)) )
+
+        for anumber in range(aggregatecnt):
+            aggrSwArray.append( Topo.addSwitch(self, "a"+str(anumber)) )
+        
+        for cswitch in coreSwArray:
+            for aswitch in aggrSwArray:
+                Topo.addLink( self, cswitch, aswitch )
         pass
 
-        "Set up Edge level, Connection Aggregation - Edge level "
-        #WRITE YOUR CODE HERE!
+        #Set up Edge level, Connection Aggregation - Edge level 
+        for enumber in range(edgecnt):
+            edgeSwArray.append( Topo.addSwitch(self, "e"+str(enumber)))
+
+        for aswitch in aggrSwArray:
+            for eswitch in edgeSwArray:
+                Topo.addLink( self, aswitch, eswitch, )
         pass
         
-        "Set up Host level, Connection Edge - Host level "
-        #WRITE YOUR CODE HERE!
+        #Set up Host level, Connection Edge - Host level
+        for hostnumber in range(hostscnt):
+            newhost = Topo.addHost(self, "h"+str(hostnumber))
+            hostsArray.append( newhost )
+
+            Topo.addLink(self, newhost, edgeSwArray[int(hostnumber/2)])
         pass
 	
 
