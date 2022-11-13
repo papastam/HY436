@@ -11,6 +11,8 @@ from pox.core import core
 from pox.openflow import ethernet
 import pox.openflow.libopenflow_01 as of
 from pox.lib.packet.arp import arp
+from pox.lib.packet.tcp import tcp
+from pox.lib.packet.udp import udp
 from pox.lib.addresses import EthAddr, IPAddr
 from pox.lib.revent import *
 from pox.lib.recoco import Timer
@@ -24,13 +26,19 @@ from pprint import pprint as pp
 log = core.getLogger()
 
 MAX_PHYS_PORTS  = 0xFF00
-ALLOW_SPAM      = 0
+ALLOW_SPAM      = 1
+DEBUG           = 1
 
 # dict of TCP and UDP proto numbers
 PROTO_NUMS = {
   6 : 'tcp',
   17: 'udp/other'
 }
+
+def debug(message):
+    if DEBUG:
+        print("\033[41mDEBUG:\033[00m\033[93m" + str(message) + "\033[00m")
+
 
 def spampp(message):
     if ALLOW_SPAM == 1:
@@ -286,7 +294,22 @@ class CloudNetController (EventMixin):
 
 
     def install_end_to_end_IP_path(self, event, dst_dpid, final_port, packet):
-        #WRITE YOUR CODE HERE!
+        source_sw = self.switches[event.dpid]
+
+        print("\033[21minstallin new e2e IP path\033[00m")
+        if(isinstance(packet.next, tcp)):
+            proto=PROTO_NUMS["tcp"]
+        elif(isinstance(packet.next, udp)):
+            proto=PROTO_NUMS["udp"]
+
+        paths = source_sw._paths_per_proto[dst_dpid][proto]
+        print("Available paths: "+paths)
+
+        selected_path = paths[random.randint(0,len(paths))]
+        print("Selected Path :"+selected_path)
+
+        print("\033[00m")
+
         pass
 
         
@@ -390,6 +413,7 @@ class SwitchWithPaths (EventMixin):
         self._listeners = None
         self._paths = {}
         self._paths_per_proto = {}
+        # self.edge_ports = [] #edge ports REMOVE
 
     def __repr__(self):
         return dpidToStr(self.dpid)
@@ -422,15 +446,18 @@ class SwitchWithPaths (EventMixin):
         for dst in self._paths:
             equal_paths_number = len(self._paths[dst])
             if equal_paths_number > 1:
-                print("There are %i shortest paths from switch %i to switch %i:" % (equal_paths_number, self.dpid, dst))
+                # print("There are %i shortest paths from switch %i to switch %i:" % (equal_paths_number, self.dpid, dst))
+                pass
             else:
-                print("There is exactly one shortest path from switch %i to switch %i:" % (self.dpid, dst))
+                pass
+                # print("There is exactly one shortest path from switch %i to switch %i:" % (self.dpid, dst))
             for proto_num in self._paths_per_proto[dst]:
-                print("---%s (%s) paths---" % (str(PROTO_NUMS[proto_num]), str(proto_num)))
+                # print("---%s (%s) paths---" % (str(PROTO_NUMS[proto_num]), str(proto_num)))
                 for path in self._paths_per_proto[dst][proto_num]:
                     for u in path:
-                         print("%i," % (u),)
-                    print("")
+                        pass
+                        #  print("%i," % (u),)
+                    # print("")
 
 
     def connect(self, connection):
@@ -439,6 +466,11 @@ class SwitchWithPaths (EventMixin):
         assert(self.dpid == connection.dpid)
         if self.ports is None:
             self.ports = connection.features.ports
+            # for port in self.ports: REMOVE
+            #     debug(port)
+            #     debug(str(port)[:4] +">"+ str(self.dpid))
+            #     if(int(str(port)[:4]) > self.dpid):
+            #         self.edge_ports.append(port)
         log.info("Connect %s" % (connection))
         self.connection = connection
         self._listeners = self.listenTo(connection)
@@ -450,9 +482,14 @@ class SwitchWithPaths (EventMixin):
             self.connection = None
             self._listeners = None
 
-    def flood_on_switch_edge(self, packet, no_flood_ports):
-        #WRITE YOUR CODE HERE!
-        pass
+    def flood_on_switch_edge(self, packet, no_flood_ports): 
+        debug("flooding given packet on all switch edges (sw:%d)" % self.dpid)
+        for port in self.ports:
+            if (port in no_flood_ports):
+                debug("Illigal port detection alert")
+                continue
+            debug("forwarding packet to port: "+str(port))
+            self.send_packet(port.port_no, packet)
 
     def send_packet(self, outport, packet_data=None):
         msg = of.ofp_packet_out(in_port=of.OFPP_NONE)
@@ -461,8 +498,31 @@ class SwitchWithPaths (EventMixin):
         self.connection.send(msg)
 
     def send_arp_reply(self, packet, dst_port, req_mac):
-        #WRITE YOUR CODE HERE!
-        pass
+        #craft arp reply
+        r = arp()
+
+        r.hwtype = r.HW_TYPE_ETHERNET 	#type of hardware tyr
+        r.prototype = r.PROTO_TYPE_IP 	#protocolo type
+        r.hwlen = 6  					#hardware addrese length 6 bytes and mac=ipv6 
+        r.protolen = r.protolen 	
+
+        r.opcode    = r.REPLY
+        r.hwsrc     = req_mac
+        r.hwdst     = packet.src
+        r.protodst  = packet.payload.protosrc
+        r.protosrc  = packet.payload.protodst 
+
+        #craft ethernet packet
+        e = ethernet(type=ethernet.ARP_TYPE, src=packet.payload.protodst, dst=packet.payload.protosrc)
+        e.set_payload(r)
+
+        #send packet
+        msg = of.ofp_packet_out()
+        msg.data = e.pack()
+        msg.actions.append(of.ofp_action_output(port =of.OFPP_IN_PORT)) # in which port clients can hear 
+        msg.in_port = dst_port
+        self.connection.send(msg)
+
 
     def install_output_flow_rule(self, outport, match, idle_timeout=0, hard_timeout=0):
         msg=of.ofp_flow_mod()

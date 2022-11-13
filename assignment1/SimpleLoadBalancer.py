@@ -185,7 +185,7 @@ class SimpleLoadBalancer(object):
         msg         = of.ofp_packet_out()
         msg.data    = e.pack()
         msg.in_port = outport
-        msg.actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
+        msg.actions.append(of.ofp_action_output(port=outport))
         connection.send(msg)
         
         log.info(colors.yellow + "Sent ARP reply to " + self.ip_wcolor(packet.payload.protosrc) + colors.yellow + " from " + self.mac_wcolor(requested_mac) + colors.reset)

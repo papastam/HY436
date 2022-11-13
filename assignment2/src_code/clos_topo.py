@@ -22,7 +22,7 @@ def debug(message):
 class ClosTopo(Topo):
 
     def printTopo(self, cores, fanout):
-        nodespace = (cores*fanout*fanout*fanout/10)+3
+        nodespace = (cores*fanout*fanout*fanout/10)+7
         linespace = cores*fanout*fanout*fanout*nodespace+6
 
         cstr = ""
@@ -70,36 +70,38 @@ class ClosTopo(Topo):
 
         #Set up Core and Aggregate level, Connection Core - Aggregation level
         for cnumber in range(cores):
-            self.coreSwArray.append( Topo.addSwitch(self, "c"+str(cnumber)) )
-            debug("Created Core Switch: c"+str(cnumber))
+            self.coreSwArray.append( Topo.addSwitch(self, str(1000+cnumber+1)) )
+            debug("Created Core Switch: c"+str(cnumber+1))
 
         for anumber in range(aggregatecnt):
-            self.aggrSwArray.append( Topo.addSwitch(self, "a"+str(anumber)) )
-            debug("Created Aggregate Switch: a"+str(anumber))
+            self.aggrSwArray.append( Topo.addSwitch(self, str(2000+anumber+1)) )
+            debug("Created Aggregate Switch: a"+str(anumber+1))
         
         for cswitch in self.coreSwArray:
             for aswitch in self.aggrSwArray:
                 Topo.addLink( self, cswitch, aswitch )
+                debug("Created Link: " + cswitch + " - " + aswitch)
         pass
 
         #Set up Edge level, Connection Aggregation - Edge level 
         for enumber in range(edgecnt):
-            self.edgeSwArray.append( Topo.addSwitch(self, "e"+str(enumber)))
-            debug("Created Edge Switch: e"+str(enumber))
+            self.edgeSwArray.append( Topo.addSwitch(self, str(3000+enumber+1)))
+            debug("Created Edge Switch: e"+str(enumber+1))
 
         for aswitch in self.aggrSwArray:
             for eswitch in self.edgeSwArray:
                 Topo.addLink( self, aswitch, eswitch, )
+                debug("Created Link: " + aswitch + " - " + eswitch)
         pass
         
         #Set up Host level, Connection Edge - Host level
         for hostnumber in range(hostscnt):
-            newhost = Topo.addHost(self, "h"+str(hostnumber))
+            newhost = Topo.addHost(self, str(4000+hostnumber+1))
             self.hostsArray.append( newhost )
-            debug("Created Host: h"+str(hostnumber))
+            debug("Created Host: h"+str(hostnumber+1))
 
             Topo.addLink(self, newhost, self.edgeSwArray[int(hostnumber/fanout)])
-            debug("Created Link: h"+str(hostnumber)+" - e"+str(int(hostnumber/fanout)))
+            debug("Created Link: h"+str(hostnumber+1)+" - e"+str(int(hostnumber/fanout)))
 
         self.printTopo(cores, fanout)
 
