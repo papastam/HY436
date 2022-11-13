@@ -10,9 +10,8 @@ import csv
 from pox.core import core
 from pox.openflow import ethernet
 import pox.openflow.libopenflow_01 as of
+import pox.lib.packet as pkt
 from pox.lib.packet.arp import arp
-from pox.lib.packet.tcp import tcp
-from pox.lib.packet.udp import udp
 from pox.lib.addresses import EthAddr, IPAddr
 from pox.lib.revent import *
 from pox.lib.recoco import Timer
@@ -26,7 +25,7 @@ from pprint import pprint as pp
 log = core.getLogger()
 
 MAX_PHYS_PORTS  = 0xFF00
-ALLOW_SPAM      = 1
+ALLOW_SPAM      = 0
 DEBUG           = 1
 
 # dict of TCP and UDP proto numbers
@@ -164,6 +163,8 @@ class CloudNetController (EventMixin):
         packet = event.parsed
         dpid = event.dpid
         inport = event.port
+        # debug("Packet: "+str(packet.__dict__))
+        # debug("Packet.next: "+str(packet.next.protocol))
 
         def handle_ARP_pktin():
             srcip = IPAddr(packet.next.protosrc)
@@ -177,7 +178,7 @@ class CloudNetController (EventMixin):
 
                 #FIREWALL functionality
                 if self.firewall_capability:
-                    try:
+                    try:#CP CODE
                         #WRITE YOUR CODE HERE!
                         pass
                     except KeyError:
@@ -204,7 +205,7 @@ class CloudNetController (EventMixin):
 
                 #FIREWALL functionality
                 if self.firewall_capability:
-                    try:
+                    try:#CP CODE
                         #WRITE YOUR CODE HERE!
                         pass
                     except KeyError:
@@ -236,7 +237,7 @@ class CloudNetController (EventMixin):
 
             #FIREWALL functionality
             if self.firewall_capability:
-                try:
+                try:#CP CODE
                     #WRITE YOUR CODE HERE!
                     pass
                 except KeyError:
@@ -293,27 +294,40 @@ class CloudNetController (EventMixin):
             return
 
 
-    def install_end_to_end_IP_path(self, event, dst_dpid, final_port, packet):
+    def install_end_to_end_IP_path(self, event, dst_dpid, final_port, packet): #CP CODE
         source_sw = self.switches[event.dpid]
 
-        print("\033[21minstallin new e2e IP path\033[00m")
-        if(isinstance(packet.next, tcp)):
-            proto=PROTO_NUMS["tcp"]
-        elif(isinstance(packet.next, udp)):
-            proto=PROTO_NUMS["udp"]
+        print("\033[37mInstalling new e2e IP path\033[00m")
+        if(packet.next.protocol==6):protonum=6
+        else: protonum=17
 
-        paths = source_sw._paths_per_proto[dst_dpid][proto]
-        print("Available paths: "+paths)
+        paths = source_sw._paths_per_proto[dst_dpid][protonum]
+        debug("Available paths: "+str(paths))
 
-        selected_path = paths[random.randint(0,len(paths))]
-        print("Selected Path :"+selected_path)
+        selected_path = paths[random.randint(0,len(paths)-1)]
+        debug("Selected Path :"+str(selected_path))
 
-        print("\033[00m")
+        my_match            = of.ofp_match()
+        my_match.dl_type    = 0x0800
+        my_match.nw_src     = event.parsed.next.srcip
+        my_match.nw_dst     = event.parsed.next.dstip
+        if(packet.next.protocol==6):my_match.nw_proto = 6
+
+        self.switches[selected_path[-1]].install_output_flow_rule(final_port, my_match,10)
+        debug("Installed new flow rule (%s -> %s)" % (selected_path[-1],"FINAL_HOST"))
+        
+        for linkindex in range( len(selected_path)-2, 0-1, -1): #reverse count
+            self.switches[selected_path[linkindex]].install_output_flow_rule(self.sw_sw_ports[(selected_path[linkindex],selected_path[linkindex+1])], my_match, 10)
+            debug("Installed new flow rule (%s -> %s)" % (selected_path[linkindex],selected_path[linkindex+1]))
+
+        if event.dpid == dst_dpid:
+            source_sw.send_packet(final_port, event.parsed)
+        else:
+            self.switches[dst_dpid].send_packet(final_port, event.parsed)
 
         pass
 
-        
-    def install_migrated_end_to_end_IP_path(self, event, dst_dpid, dst_port, packet, forward_path=True):
+    def install_migrated_end_to_end_IP_path(self, event, dst_dpid, dst_port, packet, forward_path=True):#CP CODE
         #WRITE YOUR CODE HERE!
         pass
 
@@ -404,7 +418,6 @@ class CloudNetController (EventMixin):
     def __str__(self):
         return "Cloud Network Controller"
 
-
 class SwitchWithPaths (EventMixin):
     def __init__(self):
         self.connection = None
@@ -413,7 +426,6 @@ class SwitchWithPaths (EventMixin):
         self._listeners = None
         self._paths = {}
         self._paths_per_proto = {}
-        # self.edge_ports = [] #edge ports REMOVE
 
     def __repr__(self):
         return dpidToStr(self.dpid)
@@ -459,18 +471,12 @@ class SwitchWithPaths (EventMixin):
                         #  print("%i," % (u),)
                     # print("")
 
-
     def connect(self, connection):
         if self.dpid is None:
             self.dpid = connection.dpid
         assert(self.dpid == connection.dpid)
         if self.ports is None:
             self.ports = connection.features.ports
-            # for port in self.ports: REMOVE
-            #     debug(port)
-            #     debug(str(port)[:4] +">"+ str(self.dpid))
-            #     if(int(str(port)[:4]) > self.dpid):
-            #         self.edge_ports.append(port)
         log.info("Connect %s" % (connection))
         self.connection = connection
         self._listeners = self.listenTo(connection)
@@ -482,14 +488,17 @@ class SwitchWithPaths (EventMixin):
             self.connection = None
             self._listeners = None
 
-    def flood_on_switch_edge(self, packet, no_flood_ports): 
-        debug("flooding given packet on all switch edges (sw:%d)" % self.dpid)
+    def flood_on_switch_edge(self, packet, no_flood_ports): #CP CODE
+        # debug("flooding given packet on all switch edges (sw:%d)" % (self.dpid))
+        
         for port in self.ports:
-            if (port in no_flood_ports):
-                debug("Illigal port detection alert")
+            # debug("DC: %s in %s"%(port.port_no,no_flood_ports))
+            if (port.port_no in no_flood_ports) or (port.port_no == 65534):
+                # debug("no_flood_port detected (%d)"%port.port_no)
                 continue
-            debug("forwarding packet to port: "+str(port))
+            # debug("forwarding packet to port: "+str(port))
             self.send_packet(port.port_no, packet)
+        
 
     def send_packet(self, outport, packet_data=None):
         msg = of.ofp_packet_out(in_port=of.OFPP_NONE)
@@ -497,14 +506,14 @@ class SwitchWithPaths (EventMixin):
         msg.actions.append(of.ofp_action_output(port=outport))
         self.connection.send(msg)
 
-    def send_arp_reply(self, packet, dst_port, req_mac):
+    def send_arp_reply(self, packet, dst_port, req_mac): #CP CODE
         #craft arp reply
         r = arp()
 
-        r.hwtype = r.HW_TYPE_ETHERNET 	#type of hardware tyr
-        r.prototype = r.PROTO_TYPE_IP 	#protocolo type
-        r.hwlen = 6  					#hardware addrese length 6 bytes and mac=ipv6 
-        r.protolen = r.protolen 	
+        r.hwtype = r.HW_TYPE_ETHERNET
+        r.prototype = r.PROTO_TYPE_IP
+        r.hwlen = 6
+        r.protolen = r.protolen
 
         r.opcode    = r.REPLY
         r.hwsrc     = req_mac
@@ -513,16 +522,12 @@ class SwitchWithPaths (EventMixin):
         r.protosrc  = packet.payload.protodst 
 
         #craft ethernet packet
-        e = ethernet(type=ethernet.ARP_TYPE, src=packet.payload.protodst, dst=packet.payload.protosrc)
+        e = ethernet(type=ethernet.ARP_TYPE, src=req_mac, dst=packet.src)
         e.set_payload(r)
 
         #send packet
-        msg = of.ofp_packet_out()
-        msg.data = e.pack()
-        msg.actions.append(of.ofp_action_output(port =of.OFPP_IN_PORT)) # in which port clients can hear 
-        msg.in_port = dst_port
-        self.connection.send(msg)
-
+        debug("sending arp packet (%s) to port %s"%(str(e),str(dst_port)))
+        self.send_packet(dst_port,e.pack())
 
     def install_output_flow_rule(self, outport, match, idle_timeout=0, hard_timeout=0):
         msg=of.ofp_flow_mod()
