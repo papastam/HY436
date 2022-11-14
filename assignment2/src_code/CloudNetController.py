@@ -36,8 +36,10 @@ PROTO_NUMS = {
 
 def debug(message):
     if DEBUG:
-        print("\033[41mDEBUG:\033[00m\033[93m" + str(message) + "\033[00m")
+        print("\033[47mDEBUG:\033[00m\033[93m " + str(message) + "\033[00m")
 
+def warrning(message):
+        print("\033[44mWARRNING:\033[00m\033[34m " + str(message) + "\033[00m")
 
 def spampp(message):
     if ALLOW_SPAM == 1:
@@ -179,8 +181,11 @@ class CloudNetController (EventMixin):
                 #FIREWALL functionality
                 if self.firewall_capability:
                     try:#CP CODE
-                        #WRITE YOUR CODE HERE!
-                        pass
+                        if(self.firewall_capability):
+                            if(self.firewall_policies[srcip]!=self.firewall_policies[dstip]):
+                                print("\033[41mFIREWALL:\033[00m\033[31m Illegal packet detected from %s to %s\033[00m" %(srcip,dstip))
+                                self.drop_packets(dpid,packet)
+                                return
                     except KeyError:
                         log.info("IPs not covered by policy!")
                         return
@@ -206,8 +211,11 @@ class CloudNetController (EventMixin):
                 #FIREWALL functionality
                 if self.firewall_capability:
                     try:#CP CODE
-                        #WRITE YOUR CODE HERE!
-                        pass
+                        if(self.firewall_capability):
+                            if(self.firewall_policies[srcip]!=self.firewall_policies[dstip]):
+                                print("\033[41mFIREWALL:\033[00m\033[31m Illegal packet detected from %s to %s\033[00m" %(srcip,dstip))
+                                self.drop_packets(dpid,packet)
+                                return
                     except KeyError:
                         return
 
@@ -238,14 +246,17 @@ class CloudNetController (EventMixin):
             #FIREWALL functionality
             if self.firewall_capability:
                 try:#CP CODE
-                    #WRITE YOUR CODE HERE!
-                    pass
+                    if(self.firewall_capability):
+                        if(self.firewall_policies[srcip]!=self.firewall_policies[dstip]):
+                            print("\033[41mFIREWALL:\033[00m\033[31m Illegal packet detected from %s to %s\033[00m" %(srcip,dstip))
+                            self.drop_packets(dpid,packet)
+                            return
                 except KeyError:
-                    log.info("IPs not covered by policy!")
+                    log.info("\033[41mFIREWALL:\033[00m\033[31mIPs not covered by policy!\033[00m")
                     return
 
             if self._paths_computed:
-                #print("Routing calculations have converged"
+                debug("Routing calculations have converged")
                 log.info("Path requested for flow %s-->%s" % (str(srcip), str(dstip)))
 
                 if dstip in self.arpmap: #I know where to send the packet
@@ -274,7 +285,7 @@ class CloudNetController (EventMixin):
                 else:
                     self.flood_on_all_switch_edges(packet, dpid, inport)
             else:
-                print("Routing calculations have not converged, discarding packet")
+                debug("Routing calculations have not converged, discarding packet")
                 return
 
         #--------------------------------------------------------------------------------------------------------------
@@ -297,15 +308,15 @@ class CloudNetController (EventMixin):
     def install_end_to_end_IP_path(self, event, dst_dpid, final_port, packet): #CP CODE
         source_sw = self.switches[event.dpid]
 
-        print("\033[37mInstalling new e2e IP path\033[00m")
+        print("\033[35mInstalling new e2e IP path %s -> %s \033[00m" %(event.parsed.next.srcip,event.parsed.next.dstip))
         if(packet.next.protocol==6):protonum=6
         else: protonum=17
 
         paths = source_sw._paths_per_proto[dst_dpid][protonum]
-        debug("Available paths: "+str(paths))
+        # debug("Available paths: "+str(paths))
 
         selected_path = paths[random.randint(0,len(paths)-1)]
-        debug("Selected Path :"+str(selected_path))
+        # debug("Selected Path :"+str(selected_path))
 
         my_match            = of.ofp_match()
         my_match.dl_type    = 0x0800
@@ -314,11 +325,11 @@ class CloudNetController (EventMixin):
         if(packet.next.protocol==6):my_match.nw_proto = 6
 
         self.switches[selected_path[-1]].install_output_flow_rule(final_port, my_match,10)
-        debug("Installed new flow rule (%s -> %s)" % (selected_path[-1],"FINAL_HOST"))
+        # debug("Installed new flow rule (%s -> %s)" % (selected_path[-1],"FINAL_HOST"))
         
         for linkindex in range( len(selected_path)-2, 0-1, -1): #reverse count
             self.switches[selected_path[linkindex]].install_output_flow_rule(self.sw_sw_ports[(selected_path[linkindex],selected_path[linkindex+1])], my_match, 10)
-            debug("Installed new flow rule (%s -> %s)" % (selected_path[linkindex],selected_path[linkindex+1]))
+            # debug("Installed new flow rule (%s -> %s)" % (selected_path[linkindex],selected_path[linkindex+1]))
 
         if event.dpid == dst_dpid:
             source_sw.send_packet(final_port, event.parsed)
@@ -375,6 +386,7 @@ class CloudNetController (EventMixin):
         port1 = link.port1
         dpid2 = link.dpid2
         port2 = link.port2
+        print("\033[32mNew link discovered! (%s->%s)\033[00m" %(dpid1,dpid2))
         if dpid1 not in self.adjs:
             self.adjs[dpid1] = set([])
         if dpid2 not in self.adjs:
@@ -395,20 +407,21 @@ class CloudNetController (EventMixin):
             if dpid1 in self.adjs[dpid2]:
                 self.adjs[dpid2].remove(dpid1)
 
-        print("Current switch-to-switch ports:")
-        spampp(self.sw_sw_ports)
-        print("Current adjacencies:")
-        spampp(self.adjs)
+        # print("Current switch-to-switch ports:")
+        # spampp(self.sw_sw_ports)
+        # print("Current adjacencies:")
+        # spampp(self.adjs)
         self._paths_computed=False
         self.checkPaths()
         if self._paths_computed == False:
-            print("Warning: Disjoint topology, Shortest Path Routing converging")
+            warrning("Disjoint topology, Shortest Path Routing converging")
         else:
-            print("Topology connected, Shortest paths (re)computed successfully, Routing converged")
-            print("--------------------------")
+            # print("Topology connected, Shortest paths (re)computed successfully, Routing converged")
+            # print("--------------------------")
             for dpid in self.switches:
-                self.switches[dpid].printPaths()
-            print("--------------------------")
+                pass
+                # self.switches[dpid].printPaths()
+            # print("--------------------------")
 
     def checkPaths(self):
         if not self._paths_computed:
@@ -458,18 +471,15 @@ class SwitchWithPaths (EventMixin):
         for dst in self._paths:
             equal_paths_number = len(self._paths[dst])
             if equal_paths_number > 1:
-                # print("There are %i shortest paths from switch %i to switch %i:" % (equal_paths_number, self.dpid, dst))
-                pass
+                print("There are %i shortest paths from switch %i to switch %i:" % (equal_paths_number, self.dpid, dst))
             else:
-                pass
-                # print("There is exactly one shortest path from switch %i to switch %i:" % (self.dpid, dst))
+                print("There is exactly one shortest path from switch %i to switch %i:" % (self.dpid, dst))
             for proto_num in self._paths_per_proto[dst]:
-                # print("---%s (%s) paths---" % (str(PROTO_NUMS[proto_num]), str(proto_num)))
+                print("---%s (%s) paths---" % (str(PROTO_NUMS[proto_num]), str(proto_num)))
                 for path in self._paths_per_proto[dst][proto_num]:
                     for u in path:
-                        pass
-                        #  print("%i," % (u),)
-                    # print("")
+                        print("%i," % (u),)
+                    print("")
 
     def connect(self, connection):
         if self.dpid is None:
@@ -547,24 +557,24 @@ class SwitchWithPaths (EventMixin):
         msg.actions = [] #empty action list for dropping packets
         self.connection.send(msg)
 
-    def send_forward_migrated_packet(self, outport, dst_mac, dst_ip, packet_data=None):
+    def send_forward_migrated_packet(self, outport, dst_mac, dst_ip, packet_data=None):#CP CODE
         #WRITE YOUR CODE HERE!
         pass
 
-    def send_reverse_migrated_packet(self, outport, src_mac, src_ip, packet_data=None):
+    def send_reverse_migrated_packet(self, outport, src_mac, src_ip, packet_data=None):#CP CODE
         #WRITE YOUR CODE HERE!
         pass
         
-    def install_forward_migration_rule(self, outport, dst_mac, dst_ip, match, idle_timeout=0, hard_timeout=0):
+    def install_forward_migration_rule(self, outport, dst_mac, dst_ip, match, idle_timeout=0, hard_timeout=0):#CP CODE
         #WRITE YOUR CODE HERE!
         pass
 
-    def install_reverse_migration_rule(self, outport, src_mac, src_ip, match, idle_timeout=0, hard_timeout=0):
+    def install_reverse_migration_rule(self, outport, src_mac, src_ip, match, idle_timeout=0, hard_timeout=0):#CP CODE
         #WRITE YOUR CODE HERE!
         pass
 
 
-def ShortestPaths(switches, adjs):
+def ShortestPaths(switches, adjs):#CP CODE
     topograph = nx.Graph()
 
     for dpid in adjs:
