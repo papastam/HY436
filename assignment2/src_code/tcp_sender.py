@@ -15,8 +15,12 @@ print "message:", MESSAGE
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((TCP_IP, TCP_PORT))
 
+index = 0
 while True:
-    sock.send(MESSAGE)
+    message2send = MESSAGE+str(index)
+    print("sent message: "+message2send)
+    sock.send(message2send)
+    index+=1
     time.sleep(2)
 
 sock.close()
