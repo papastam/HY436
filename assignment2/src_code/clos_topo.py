@@ -63,6 +63,7 @@ class ClosTopo(Topo):
         self.aggrSwArray =[]
         self.edgeSwArray =[]
         self.hostsArray  =[]
+        swindex=1
        
         aggregatecnt    = cores * fanout
         edgecnt         = aggregatecnt * fanout
@@ -70,12 +71,14 @@ class ClosTopo(Topo):
 
         #Set up Core and Aggregate level, Connection Core - Aggregation level
         for cnumber in range(cores):
-            self.coreSwArray.append( Topo.addSwitch(self, str(1000+cnumber+1)) )
-            debug("Created Core Switch: c"+str(cnumber+1))
+            self.coreSwArray.append( Topo.addSwitch(self, str("c"+str(swindex))) )
+            debug("Created Core Switch: c"+str(swindex))
+            swindex+=1
 
         for anumber in range(aggregatecnt):
-            self.aggrSwArray.append( Topo.addSwitch(self, str(2000+anumber+1)) )
-            debug("Created Aggregate Switch: a"+str(anumber+1))
+            self.aggrSwArray.append( Topo.addSwitch(self, "a"+str(swindex)) )
+            debug("Created Aggregate Switch: a"+str(swindex))
+            swindex+=1
         
         for cswitch in self.coreSwArray:
             for aswitch in self.aggrSwArray:
@@ -85,8 +88,10 @@ class ClosTopo(Topo):
 
         #Set up Edge level, Connection Aggregation - Edge level 
         for enumber in range(edgecnt):
-            self.edgeSwArray.append( Topo.addSwitch(self, str(3000+enumber+1)))
-            debug("Created Edge Switch: e"+str(enumber+1))
+            self.edgeSwArray.append( Topo.addSwitch(self, "e"+str(swindex)))
+            debug("Created Edge Switch: e"+str("e"+str(swindex)))
+            swindex+=1
+
 
         for aswitch in self.aggrSwArray:
             for eswitch in self.edgeSwArray:
@@ -96,7 +101,7 @@ class ClosTopo(Topo):
         
         #Set up Host level, Connection Edge - Host level
         for hostnumber in range(hostscnt):
-            newhost = Topo.addHost(self, str(4000+hostnumber+1))
+            newhost = Topo.addHost(self, "h"+str(hostnumber+1))
             self.hostsArray.append( newhost )
             debug("Created Host: h"+str(hostnumber+1))
 
