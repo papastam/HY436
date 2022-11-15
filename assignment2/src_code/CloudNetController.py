@@ -190,11 +190,10 @@ class CloudNetController (EventMixin):
                 #FIREWALL functionality
                 if self.firewall_capability:
                     try:#CP CODE
-                        if(self.firewall_capability):
-                            if(self.firewall_policies[srcip]!=self.firewall_policies[dstip]):
-                                print("\033[41mFIREWALL:\033[00m\033[31m Illegal packet detected from %s to %s\033[00m" %(srcip,dstip))
-                                self.drop_packets(dpid,packet)
-                                return
+                        if(self.firewall_policies[srcip]!=self.firewall_policies[dstip]):
+                            print("\033[41mFIREWALL:\033[00m\033[31m Illegal packet detected from %s to %s\033[00m" %(srcip,dstip))
+                            self.drop_packets(dpid,packet)
+                            return
                     except KeyError:
                         arpprint("IPs not covered by policy!")
                         return
@@ -220,11 +219,10 @@ class CloudNetController (EventMixin):
                 #FIREWALL functionality
                 if self.firewall_capability:
                     try:#CP CODE
-                        if(self.firewall_capability):
-                            if(self.firewall_policies[srcip]!=self.firewall_policies[dstip]):
-                                print("\033[41mFIREWALL:\033[00m\033[31m Illegal packet detected from %s to %s\033[00m" %(srcip,dstip))
-                                self.drop_packets(dpid,packet)
-                                return
+                        if(self.firewall_policies[srcip]!=self.firewall_policies[dstip]):
+                            print("\033[41mFIREWALL:\033[00m\033[31m Illegal packet detected from %s to %s\033[00m" %(srcip,dstip))
+                            self.drop_packets(dpid,packet)
+                            return
                     except KeyError:
                         return
 
@@ -255,11 +253,10 @@ class CloudNetController (EventMixin):
             #FIREWALL functionality
             if self.firewall_capability:
                 try:#CP CODE
-                    if(self.firewall_capability):
-                        if(self.firewall_policies[srcip]!=self.firewall_policies[dstip]):
-                            print("\033[41mFIREWALL:\033[00m\033[31m Illegal packet detected from %s to %s\033[00m" %(srcip,dstip))
-                            self.drop_packets(dpid,packet)
-                            return
+                    if(self.firewall_policies[srcip]!=self.firewall_policies[dstip]):
+                        print("\033[41mFIREWALL:\033[00m\033[31m Illegal packet detected from %s to %s\033[00m" %(srcip,dstip))
+                        self.drop_packets(dpid,packet)
+                        return
                 except KeyError:
                     ipprint("\033[41mFIREWALL:\033[00m\033[31mIPs not covered by policy!\033[00m")
                     return
@@ -346,12 +343,16 @@ class CloudNetController (EventMixin):
             self.switches[dst_dpid].send_packet(final_port, event.parsed)
 
     def install_migrated_end_to_end_IP_path(self, event, dst_dpid, dst_port, packet, forward_path=True):#CP CODE
-        if forward_path:
-            
-
-
         source_sw = self.switches[event.dpid]
-
+        
+        #calculate data for the new path
+        if forward_path:
+            new_host_ip = self.old_migrated_IPs[event.parsed.next.dstip]
+        else:
+            new_host_ip = self.old_migrated_IPs[event.parsed.next.srcip]
+        (new_host_mac, new_host_dpid, new_host_port) = self.arpmap[new_host_ip]
+            
+        
         print("\033[35mInstalling new e2e migrated IP path %s -> %s \033[00m" %(event.parsed.next.srcip,event.parsed.next.dstip))
         if(packet.next.protocol==6):protonum=6
         else: protonum=17
@@ -362,24 +363,56 @@ class CloudNetController (EventMixin):
         selected_path = paths[random.randint(0,len(paths)-1)]
         # debug("Selected Path :"+str(selected_path))
 
-        my_match            = of.ofp_match()
-        my_match.dl_type    = 0x0800
-        my_match.nw_src     = event.parsed.next.srcip
-        my_match.nw_dst     = event.parsed.next.dstip
-        if(packet.next.protocol==6):my_match.nw_proto = 6
 
-        self.switches[selected_path[-1]].install_output_flow_rule(final_port, my_match,10)
-        # debug("Installed new flow rule (%s -> %s)" % (selected_path[-1],"FINAL_HOST"))
+        new_match            = of.ofp_match()
+        new_match.dl_type    = 0x0800
         
-        for linkindex in range( len(selected_path)-2, 0-1, -1): #reverse count
-            self.switches[selected_path[linkindex]].install_output_flow_rule(self.sw_sw_ports[(selected_path[linkindex],selected_path[linkindex+1])], my_match, 10)
-            # debug("Installed new flow rule (%s -> %s)" % (selected_path[linkindex],selected_path[linkindex+1]))
+        before_rw_match            = of.ofp_match()
+        before_rw_match.dl_type    = 0x0800
+
+        if forward_path:
+            new_match.nw_src           = event.parsed.next.srcip
+            new_match.nw_dst           = new_host_ip
+            
+            before_rw_match.nw_src     = event.parsed.next.srcip
+            before_rw_match.nw_dst     = event.parsed.next.dstip
+        else:
+            new_match.nw_src           = new_host_ip
+            new_match.nw_dst           = event.parsed.next.dstip
+        
+            before_rw_match.nw_src     = event.parsed.next.srcip
+            before_rw_match.nw_dst     = event.parsed.next.dstip
+
+        if(packet.next.protocol==6):
+            new_match.nw_proto          = 6
+            before_rw_match.nw_proto    = 6
 
         if event.dpid == dst_dpid:
-            source_sw.send_packet(dst_port, event.parsed)
-        else:
-            self.switches[dst_dpid].send_packet(dst_port, event.parsed)
+            if forward_path:
+                source_sw.install_forward_migration_rule(dst_port, new_host_mac, new_host_ip, before_rw_match, 10)
+                source_sw.send_forward_migrated_packet(dst_port, event.parsed)
+            
+            else:
+                source_sw.install_reverse_migration_rule(dst_port, new_host_mac, new_host_ip, before_rw_match, 10)
+                source_sw.send_reverse_migrated_packet(dst_port, event.parsed)
 
+        else:
+            if forward_path:
+                source_sw.install_forward_migration_rule(self.sw_sw_ports[(selected_path[0],selected_path[1])], new_host_mac, new_host_ip, before_rw_match, 10)
+            else:
+                source_sw.install_reverse_migration_rule(self.sw_sw_ports[(selected_path[0],selected_path[1])], new_host_mac, new_host_ip, before_rw_match, 10)
+
+            self.switches[selected_path[-1]].install_output_flow_rule(dst_port, new_match,10)
+            # debug("Installed new flow rule (%s -> %s)" % (selected_path[-1],"FINAL_HOST"))
+            
+            for linkindex in range( len(selected_path)-3, 0-1, -1): #reverse count
+                self.switches[selected_path[linkindex]].install_output_flow_rule(self.sw_sw_ports[(selected_path[linkindex],selected_path[linkindex+1])], new_match, 10)
+                # debug("Installed new flow rule (%s -> %s)" % (selected_path[linkindex],selected_path[linkindex+1]))
+
+            if forward_path:
+                self.switches[dst_dpid].send_forward_migrated_packet(dst_port, event.parsed)
+            else:
+                self.switches[dst_dpid].send_reverse_migrated_packet(dst_port, event.parsed)
 
     def handle_migration(self, old_IP, new_IP):
         migrationprint("Handling migration from %s to %s..." % (str(old_IP), str(new_IP)))
@@ -479,7 +512,7 @@ class SwitchWithPaths (EventMixin):
         self._paths_per_proto = {}
 
     def __repr__(self):
-        return dpidToStr(self.dpid)
+        return str(self.dpid)
 
     def appendPaths(self, dst, paths_list):
         if dst not in self._paths:
@@ -594,20 +627,51 @@ class SwitchWithPaths (EventMixin):
         msg.actions = [] #empty action list for dropping packets
         self.connection.send(msg)
 
+    '''DEBUG: {'src': EthAddr('00:00:00:00:00:02'), 'hdr_len': 14, 'dst': EthAddr('00:00:00:00:00:04'), 'payload_len': 84, 'next': <pox.lib.packet.ipv4.ipv4 object at 0xa94efec>, 'prev': None, 'type': 2048, 'parsed': True}
+    DEBUG: {'frag': 0, 'csum': 42839, 'dstip': IPAddr('10.0.0.4'), 'protocol': 1, 'srcip': IPAddr('10.0.0.2'), 'tos': 0, 'ttl': 64, 'iplen': 84, 'next': <pox.lib.packet.icmp.icmp object at 0xa94ef4c>, 'flags': 0, 'hl': 5, 'v': 4, 'id': 48972, 'prev': <pox.lib.packet.ethernet.ethernet object at 0xa94ef8c>, 'parsed': True}'''
+    
     def send_forward_migrated_packet(self, outport, dst_mac, dst_ip, packet_data=None):#CP CODE
-        #WRITE YOUR CODE HERE!
-        pass
+        #rewrite packet fields
+        packet_data.dst = dst_mac
+        packet_data.next.dstip = dst_ip
+
+        self.send_packet(outport, packet_data)
 
     def send_reverse_migrated_packet(self, outport, src_mac, src_ip, packet_data=None):#CP CODE
-        #WRITE YOUR CODE HERE!
-        pass
+        #rewrite packet fields
+        packet_data.src = src_mac
+        packet_data.next.dstip = src_ip
+
+        self.send_packet(outport, packet_data)
         
     def install_forward_migration_rule(self, outport, dst_mac, dst_ip, match, idle_timeout=0, hard_timeout=0):#CP CODE
-        #WRITE YOUR CODE HERE!
-        pass
+        migrationprint("Installed rewriting rule to switch %s for migrated address: %s through port %s" %(str(self.dpid), str(dst_ip), str(outport)))
+        
+        msg = of.ofp_flow_mod()
+        msg.idle_timeout=idle_timeout
+
+        debug(dst_ip)
+        msg.match = match
+
+        msg.actions.append(of.ofp_action_nw_addr.set_dst(dst_ip)) #replace destination ip as the chosen server ip
+        msg.actions.append(of.ofp_action_dl_addr.set_dst(EthAddr(dst_mac)))#mac address of the chosen server
+        msg.actions.append(of.ofp_action_output(port = outport)) #and send it to the chosen server's port
+
+        self.connection.send(msg)
 
     def install_reverse_migration_rule(self, outport, src_mac, src_ip, match, idle_timeout=0, hard_timeout=0):#CP CODE
-        #WRITE YOUR CODE HERE!
+        migrationprint("Installed \033[04mreturn\033[00m\033[35m rewriting rule to switch %s for migrated address: %s through port %s" &(str(self.dpid), str(dst_ip), str(outpott)))
+        
+        msg = of.ofp_flow_mod()
+        msg.idle_timeout=idle_timeout
+
+        msg.match = match
+
+        msg.actions.append(of.ofp_action_nw_addr.set_dst(src_ip)) #replace destination ip as the chosen server ip
+        msg.actions.append(of.ofp_action_dl_addr.set_dst(EthAddr(src_mac)))#mac address of the chosen server
+        msg.actions.append(of.ofp_action_output(port = outport)) #and send it to the chosen server's port
+
+        self.connection.send(msg)
         pass
 
 
@@ -619,12 +683,12 @@ def ShortestPaths(switches, adjs):#CP CODE
         for neighbor in adjs.get(dpid):
             topograph.add_edge(dpid, neighbor)
 
-    try:
-        for switch in switches:
-            for target in switches:
+    for switch in switches:
+        for target in switches:
+            try:
                 switches[switch].appendPaths(target, list(nx.all_shortest_paths(topograph,switch,target)))
-    except nx.NetworkXNoPath:
-        pass
+            except nx.NetworkXNoPath:
+                pass
 
     return True
     
