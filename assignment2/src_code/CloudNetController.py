@@ -346,6 +346,10 @@ class CloudNetController (EventMixin):
             self.switches[dst_dpid].send_packet(final_port, event.parsed)
 
     def install_migrated_end_to_end_IP_path(self, event, dst_dpid, dst_port, packet, forward_path=True):#CP CODE
+        if forward_path:
+            
+
+
         source_sw = self.switches[event.dpid]
 
         print("\033[35mInstalling new e2e migrated IP path %s -> %s \033[00m" %(event.parsed.next.srcip,event.parsed.next.dstip))
@@ -372,9 +376,9 @@ class CloudNetController (EventMixin):
             # debug("Installed new flow rule (%s -> %s)" % (selected_path[linkindex],selected_path[linkindex+1]))
 
         if event.dpid == dst_dpid:
-            source_sw.send_packet(final_port, event.parsed)
+            source_sw.send_packet(dst_port, event.parsed)
         else:
-            self.switches[dst_dpid].send_packet(final_port, event.parsed)
+            self.switches[dst_dpid].send_packet(dst_port, event.parsed)
 
 
     def handle_migration(self, old_IP, new_IP):
