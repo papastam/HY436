@@ -201,6 +201,7 @@ class CloudNetController (EventMixin):
                 if self.migration_capability:
                     #ignore ARP requests coming from old migrated IPs or directed to new ones
                     if (srcip in self.old_migrated_IPs) or (dstip in self.new_migrated_IPs):
+                        warrning("ARP request from/to migrated host detected! ignoring the request...")
                         return
 
                 if dstip in self.arpmap:
@@ -229,6 +230,7 @@ class CloudNetController (EventMixin):
                 if self.migration_capability:
                     #ignore ARP replies coming from old migrated IPs or directed to new ones
                     if (srcip in self.old_migrated_IPs) or (dstip in self.new_migrated_IPs):
+                        warrning("ARP request from/to migrated host detected! ignoring the request...")
                         return
 
                 if dstip in self.arpmap.keys():
@@ -349,7 +351,7 @@ class CloudNetController (EventMixin):
         if forward_path:
             new_host_ip = self.old_migrated_IPs[event.parsed.next.dstip]
         else:
-            new_host_ip = self.old_migrated_IPs[event.parsed.next.srcip]
+            new_host_ip = self.new_migrated_IPs[event.parsed.next.srcip]
         (new_host_mac, new_host_dpid, new_host_port) = self.arpmap[new_host_ip]
             
         
@@ -390,11 +392,11 @@ class CloudNetController (EventMixin):
         if event.dpid == dst_dpid:
             if forward_path:
                 source_sw.install_forward_migration_rule(dst_port, new_host_mac, new_host_ip, before_rw_match, 10)
-                source_sw.send_forward_migrated_packet(dst_port, event.parsed)
+                source_sw.send_forward_migrated_packet(dst_port, new_host_mac, new_host_ip, event.parsed)
             
             else:
                 source_sw.install_reverse_migration_rule(dst_port, new_host_mac, new_host_ip, before_rw_match, 10)
-                source_sw.send_reverse_migrated_packet(dst_port, event.parsed)
+                source_sw.send_reverse_migrated_packet(dst_port, new_host_mac, new_host_ip, event.parsed)
 
         else:
             if forward_path:
@@ -410,9 +412,9 @@ class CloudNetController (EventMixin):
                 # debug("Installed new flow rule (%s -> %s)" % (selected_path[linkindex],selected_path[linkindex+1]))
 
             if forward_path:
-                self.switches[dst_dpid].send_forward_migrated_packet(dst_port, event.parsed)
+                self.switches[dst_dpid].send_forward_migrated_packet(dst_port, new_host_mac, new_host_ip, event.parsed)
             else:
-                self.switches[dst_dpid].send_reverse_migrated_packet(dst_port, event.parsed)
+                self.switches[dst_dpid].send_reverse_migrated_packet(dst_port, new_host_mac, new_host_ip, event.parsed)
 
     def handle_migration(self, old_IP, new_IP):
         migrationprint("Handling migration from %s to %s..." % (str(old_IP), str(new_IP)))
@@ -606,7 +608,7 @@ class SwitchWithPaths (EventMixin):
         e.set_payload(r)
 
         #send packet
-        debug("sending arp packet (%s) to port %s"%(str(e),str(dst_port)))
+        arpprint("Sending arp packet (%s) to port %s"%(str(e),str(dst_port)))
         self.send_packet(dst_port,e.pack())
 
     def install_output_flow_rule(self, outport, match, idle_timeout=0, hard_timeout=0):
@@ -640,7 +642,7 @@ class SwitchWithPaths (EventMixin):
     def send_reverse_migrated_packet(self, outport, src_mac, src_ip, packet_data=None):#CP CODE
         #rewrite packet fields
         packet_data.src = src_mac
-        packet_data.next.dstip = src_ip
+        packet_data.next.srcip = src_ip
 
         self.send_packet(outport, packet_data)
         
@@ -660,15 +662,15 @@ class SwitchWithPaths (EventMixin):
         self.connection.send(msg)
 
     def install_reverse_migration_rule(self, outport, src_mac, src_ip, match, idle_timeout=0, hard_timeout=0):#CP CODE
-        migrationprint("Installed \033[04mreturn\033[00m\033[35m rewriting rule to switch %s for migrated address: %s through port %s" &(str(self.dpid), str(dst_ip), str(outpott)))
+        migrationprint("Installed \033[04mreturn\033[00m\033[35m rewriting rule to switch %s for migrated address: %s through port %s" %(str(self.dpid), str(src_ip), str(outport)))
         
         msg = of.ofp_flow_mod()
         msg.idle_timeout=idle_timeout
 
         msg.match = match
 
-        msg.actions.append(of.ofp_action_nw_addr.set_dst(src_ip)) #replace destination ip as the chosen server ip
-        msg.actions.append(of.ofp_action_dl_addr.set_dst(EthAddr(src_mac)))#mac address of the chosen server
+        msg.actions.append(of.ofp_action_nw_addr.set_src(src_ip)) #replace destination ip as the chosen server ip
+        msg.actions.append(of.ofp_action_dl_addr.set_src(EthAddr(src_mac)))#mac address of the chosen server
         msg.actions.append(of.ofp_action_output(port = outport)) #and send it to the chosen server's port
 
         self.connection.send(msg)
