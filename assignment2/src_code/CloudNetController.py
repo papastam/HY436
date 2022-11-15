@@ -36,10 +36,19 @@ PROTO_NUMS = {
 
 def debug(message):
     if DEBUG:
-        print("\033[47mDEBUG:\033[00m\033[93m " + str(message) + "\033[00m")
+        print("\033[103m\033[30mDEBUG:\033[00m\033[93m " + str(message) + "\033[00m")
 
 def warrning(message):
-        print("\033[44mWARRNING:\033[00m\033[34m " + str(message) + "\033[00m")
+    print("\033[44mWARRNING:\033[00m\033[34m " + str(message) + "\033[00m")
+
+def arpprint(message):
+    print("\033[46mARP:\033[00m\033[96m " + str(message) + "\033[00m")
+
+def ipprint(message):
+    print("\033[42mIP:\033[00m\033[92m " + str(message) + "\033[00m")
+
+def migrationprint(message):
+    print("\033[45mMIGRATION:\033[00m\033[35m " + str(message) + "\033[00m")
 
 def spampp(message):
     if ALLOW_SPAM == 1:
@@ -175,7 +184,7 @@ class CloudNetController (EventMixin):
                 return
 
             if packet.next.opcode == arp.REQUEST:
-                log.info("Handling ARP packet: %s requests the MAC of %s" % (str(srcip), str(dstip)))
+                arpprint("Handling ARP packet: %s requests the MAC of %s" % (str(srcip), str(dstip)))
                 self.update_learned_arp_info(packet, dpid, inport)
 
                 #FIREWALL functionality
@@ -187,7 +196,7 @@ class CloudNetController (EventMixin):
                                 self.drop_packets(dpid,packet)
                                 return
                     except KeyError:
-                        log.info("IPs not covered by policy!")
+                        arpprint("IPs not covered by policy!")
                         return
 
                 if self.migration_capability:
@@ -196,16 +205,16 @@ class CloudNetController (EventMixin):
                         return
 
                 if dstip in self.arpmap:
-                    log.info("I know where to send the crafted ARP reply!")
+                    arpprint("I know where to send the crafted ARP reply!")
                     (req_mac, req_dpid, req_port) = self.arpmap[dstip]
                     (dst_mac, dst_dpid, dst_port) = self.arpmap[srcip]
                     self.switches[dst_dpid].send_arp_reply(packet, dst_port, req_mac)
                 else:
-                    log.info("Flooding initial ARP request on all switch edges")
+                    arpprint("Flooding initial ARP request on all switch edges")
                     self.flood_on_all_switch_edges(packet, dpid, inport)
 
             elif packet.next.opcode == arp.REPLY:
-                log.info("Handling ARP packet: %s responds to %s" % (str(srcip), str(dstip)))
+                arpprint("Handling ARP packet: %s responds to %s" % (str(srcip), str(dstip)))
                 self.update_learned_arp_info(packet, dpid, inport)
 
                 #FIREWALL functionality
@@ -225,14 +234,14 @@ class CloudNetController (EventMixin):
                         return
 
                 if dstip in self.arpmap.keys():
-                    log.info("I know where to send the initial ARP reply!")
+                    arpprint("I know where to send the initial ARP reply!")
                     (dst_mac, dst_dpid, dst_port) = self.arpmap[dstip]
                     self.switches[dst_dpid].send_packet(dst_port, packet)
                 else:
-                    log.info("Flooding initial ARP reply on all switch edges")
+                    arpprint("Flooding initial ARP reply on all switch edges")
                     self.flood_on_all_switch_edges(packet,dpid,inport)
             else:
-                log.info("Unknown ARP type")
+                arpprint("Unknown ARP type")
                 return
 
         def handle_IP_pktin():
@@ -241,7 +250,7 @@ class CloudNetController (EventMixin):
             if (srcip in self.ignored_IPs) or (dstip in self.ignored_IPs):
                 return
 
-            log.info("Handling IP packet between %s and %s" % (str(srcip), str(dstip)))
+            ipprint("Handling IP packet between %s and %s" % (str(srcip), str(dstip)))
 
             #FIREWALL functionality
             if self.firewall_capability:
@@ -252,12 +261,12 @@ class CloudNetController (EventMixin):
                             self.drop_packets(dpid,packet)
                             return
                 except KeyError:
-                    log.info("\033[41mFIREWALL:\033[00m\033[31mIPs not covered by policy!\033[00m")
+                    ipprint("\033[41mFIREWALL:\033[00m\033[31mIPs not covered by policy!\033[00m")
                     return
 
             if self._paths_computed:
                 debug("Routing calculations have converged")
-                log.info("Path requested for flow %s-->%s" % (str(srcip), str(dstip)))
+                ipprint("Path requested for flow %s-->%s" % (str(srcip), str(dstip)))
 
                 if dstip in self.arpmap: #I know where to send the packet
                     (dst_mac, dst_dpid, dst_port) = self.arpmap[dstip]
@@ -268,16 +277,16 @@ class CloudNetController (EventMixin):
                         if dstip in self.old_migrated_IPs:
                             (dst_mac, dst_dpid, dst_port) = self.arpmap[self.old_migrated_IPs[dstip]]
                             #install path to new server and change packet headers
-                            log.info("Installing migrated forward path towards: old IP: %s, new IP: %s" % (str(dstip), str(self.old_migrated_IPs[dstip])))
+                            migrationprint("Installing migrated forward path towards: old IP: %s, new IP: %s" % (str(dstip), str(self.old_migrated_IPs[dstip])))
                             self.install_migrated_end_to_end_IP_path(event, dst_dpid, dst_port, packet, forward_path=True)
-                            log.info("Forward migrated path installed")
+                            migrationprint("Forward migrated path installed")
 
                         #IP packet comes from new server after migration is done
                         elif srcip in self.new_migrated_IPs:
                             (dst_mac, dst_dpid, dst_port) = self.arpmap[dstip]
-                            log.info("Installing migrated reverse path from: old IP: %s, new IP: %s" % (str(srcip), str(self.new_migrated_IPs[srcip])))
+                            migrationprint("Installing migrated reverse path from: old IP: %s, new IP: %s" % (str(srcip), str(self.new_migrated_IPs[srcip])))
                             self.install_migrated_end_to_end_IP_path(event, dst_dpid, dst_port, packet, forward_path=False)
-                            log.info("Reverse migrated path installed")
+                            migrationprint("Reverse migrated path installed")
                         else:
                             self.install_end_to_end_IP_path(event, dst_dpid, dst_port, packet)
                     else:
@@ -336,15 +345,40 @@ class CloudNetController (EventMixin):
         else:
             self.switches[dst_dpid].send_packet(final_port, event.parsed)
 
-        pass
-
     def install_migrated_end_to_end_IP_path(self, event, dst_dpid, dst_port, packet, forward_path=True):#CP CODE
-        #WRITE YOUR CODE HERE!
-        pass
+        source_sw = self.switches[event.dpid]
+
+        print("\033[35mInstalling new e2e migrated IP path %s -> %s \033[00m" %(event.parsed.next.srcip,event.parsed.next.dstip))
+        if(packet.next.protocol==6):protonum=6
+        else: protonum=17
+
+        paths = source_sw._paths_per_proto[dst_dpid][protonum]
+        # debug("Available paths: "+str(paths))
+
+        selected_path = paths[random.randint(0,len(paths)-1)]
+        # debug("Selected Path :"+str(selected_path))
+
+        my_match            = of.ofp_match()
+        my_match.dl_type    = 0x0800
+        my_match.nw_src     = event.parsed.next.srcip
+        my_match.nw_dst     = event.parsed.next.dstip
+        if(packet.next.protocol==6):my_match.nw_proto = 6
+
+        self.switches[selected_path[-1]].install_output_flow_rule(final_port, my_match,10)
+        # debug("Installed new flow rule (%s -> %s)" % (selected_path[-1],"FINAL_HOST"))
+        
+        for linkindex in range( len(selected_path)-2, 0-1, -1): #reverse count
+            self.switches[selected_path[linkindex]].install_output_flow_rule(self.sw_sw_ports[(selected_path[linkindex],selected_path[linkindex+1])], my_match, 10)
+            # debug("Installed new flow rule (%s -> %s)" % (selected_path[linkindex],selected_path[linkindex+1]))
+
+        if event.dpid == dst_dpid:
+            source_sw.send_packet(final_port, event.parsed)
+        else:
+            self.switches[dst_dpid].send_packet(final_port, event.parsed)
 
 
     def handle_migration(self, old_IP, new_IP):
-        log.info("Handling migration from %s to %s..." % (str(old_IP), str(new_IP)))
+        migrationprint("Handling migration from %s to %s..." % (str(old_IP), str(new_IP)))
         # create ofp_flow_mod message to delete all flows
         # to the destination to be migrated
         msg_1 = of.ofp_flow_mod()
@@ -365,15 +399,15 @@ class CloudNetController (EventMixin):
         # leading to the destination to be migrated (or coming from the source that will host it)
         for sw in self.switches:
             self.switches[sw].connection.send(msg_1)
-            log.info("Rules having as dest %s removed at switch: %i" % (str(old_IP), sw))
+            migrationprint("Rules having as dest %s removed at switch: %i" % (str(old_IP), sw))
             self.switches[sw].connection.send(msg_2)
-            log.info("Rules having as source %s removed at switch: %i" % (str(new_IP), sw))
-        log.info("Rules deleted, now new IP e2e paths will be automatically migrated to the new IP %s" % (str(new_IP)))
+            migrationprint("Rules having as source %s removed at switch: %i" % (str(new_IP), sw))
+        migrationprint("Rules deleted, now new IP e2e paths will be automatically migrated to the new IP %s" % (str(new_IP)))
         self.old_migrated_IPs[old_IP] = new_IP
         self.new_migrated_IPs[new_IP] = old_IP
         (new_mac, new_dpid, new_inport) = self.arpmap[self.old_migrated_IPs[old_IP]]
         self.arpmap[old_IP] = (new_mac, new_dpid, new_inport)
-        log.info("Arpmap for old ip updated")
+        migrationprint("Arpmap for old ip updated")
 
     def drop_packets(self, dpid, packet):
         match = of.ofp_match.from_packet(packet)
@@ -487,13 +521,13 @@ class SwitchWithPaths (EventMixin):
         assert(self.dpid == connection.dpid)
         if self.ports is None:
             self.ports = connection.features.ports
-        log.info("Connect %s" % (connection))
+        print("\033[32mConnect %s\033[00m" % (connection))
         self.connection = connection
         self._listeners = self.listenTo(connection)
 
     def disconnect(self):
         if self.connection is not None:
-            log.info("Disconnect %s" % (self.connection))
+            print("\033[31mDisconnect %s\033[00m" % (self.connection))
             self.connection.removeListeners(self._listeners)
             self.connection = None
             self._listeners = None
@@ -509,7 +543,6 @@ class SwitchWithPaths (EventMixin):
             # debug("forwarding packet to port: "+str(port))
             self.send_packet(port.port_no, packet)
         
-
     def send_packet(self, outport, packet_data=None):
         msg = of.ofp_packet_out(in_port=of.OFPP_NONE)
         msg.data = packet_data
@@ -608,10 +641,10 @@ def launch(firewall_capability='True', migration_capability='True',
         firewall_policy_file : string, filename of the csv file with firewall policies
         migration_info_file  : string, filename of the csv file with migration information
     """
-    log.info("Loading Cloud Network Controller")
+    print("\033[03mLoading Cloud Network Controller\033[00m")
     firewall_capability = str_to_bool(firewall_capability)
-    log.info("Firewall Capability enabled: %s" % (firewall_capability))
+    print("\033[03mFirewall Capability enabled: %s\033[00m" % (firewall_capability))
     migration_capability = str_to_bool(migration_capability)
-    log.info("Migration Capability enabled: %s" % (migration_capability))
+    print("\033[03mMigration Capability enabled: %s\033[00m" % (migration_capability))
     core.registerNew(CloudNetController, firewall_capability, migration_capability, firewall_policy_file, migration_events_file)
-    log.info("Network Controller loaded")
+    print("\033[03mNetwork Controller loaded\033[00m")
