@@ -713,8 +713,16 @@ def launch(firewall_capability='True', migration_capability='True',
     """
     print("\033[03mLoading Cloud Network Controller\033[00m")
     firewall_capability = str_to_bool(firewall_capability)
-    print("\033[03mFirewall Capability enabled: %s\033[00m" % (firewall_capability))
+    if firewall_capability:
+        print("\033[03m\033[92mFirewall Capability \033[04mENABLED\033[00m")
+    else:
+        print("\033[03m\033[31mFirewall Capability \033[04mDISABLED\033[00m")
+
     migration_capability = str_to_bool(migration_capability)
-    print("\033[03mMigration Capability enabled: %s\033[00m" % (migration_capability))
+    if migration_capability:
+        print("\033[03m\033[92mMigration Capability \033[04mENABLED\033[00m")
+    else:
+        print("\033[03m\033[31mMigration Capability \033[04mDISABLED\033[00m")
+        
     core.registerNew(CloudNetController, firewall_capability, migration_capability, firewall_policy_file, migration_events_file)
     print("\033[03mNetwork Controller loaded\033[00m")
