@@ -1,4 +1,4 @@
-# Software Defined Networks (*HY436*) 
+# Software Defined Networks (*[HY436](https://www.csd.uoc.gr/~hy436/)*) 
 In this repository you can find the assignments and my solutions of the course [*Software Defined Networks* (HY436)](https://www.csd.uoc.gr/~hy436/) during the winter semester of year 2022.
 # Assignment 1 (*Simple Load Balancer*)
 ## Overview
