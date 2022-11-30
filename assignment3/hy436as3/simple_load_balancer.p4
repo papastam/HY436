@@ -61,7 +61,7 @@ struct metadata {
     macAddr_t   dstMAC;         // the dst MAC to which the packet should be directed on L2
     bit<1>      isClient;       // whether the src IP of the packet belongs to a client
     bit<1>      isServer;       // whether the src IP of the packet belongs to a server
-    bit<8>      srcGroup;       // the group of the src host
+    bit<8>      srcGroup;       // the group of the src host    1 for RED, 2 for BLUE
     bit<8>      dstGroup;       // the group of the dst host
 }
 
@@ -86,7 +86,7 @@ parser SLBParser(packet_in packet,
     }
 
     /* parser ethernet frame */
-    state parse_ethernet {
+    state parse_ethernet {//CP Code
     	packet.extract(hdr.ethernet);
     	transition accept;
     }
@@ -125,8 +125,13 @@ control SLBIngress(inout headers hdr,
     }
 
     /* Action that transforms an ARP request into a suitable ARP reply */
-    action arp_request_to_reply(macAddr_t srcMAC, macAddr_t dstMAC, ip4Addr_t srcIP, ip4Addr_t dstIP) {
-        /* WRITE YOUR CODE HERE */
+    action arp_request_to_reply(macAddr_t srcMAC, macAddr_t dstMAC, ip4Addr_t srcIP, ip4Addr_t dstIP) {//CP Code
+        hdr.arp.opCode          = 2;
+        hdr.arp.hwSrcAddr       = srcMAC;
+        hdr.arp.hwDstAddr       = dstMAC;
+        hdr.arp.protoDstAddr    = dstIP;
+        hdr.arp.protoSrcAddr    = srcIP;
+
         standard_metadata.egress_spec = standard_metadata.ingress_port; // the reply should be sent out of the in-port
     }
 
@@ -137,10 +142,16 @@ control SLBIngress(inout headers hdr,
     }
 
     /* Action that updates metadata with the info that the src IP is a client and to which server the client is mapped */
-    action set_client_metadata(ip4Addr_t firstAllowedReplica, ip4Addr_t lastAllowedReplica) {
+    action set_client_metadata(ip4Addr_t firstAllowedReplica, ip4Addr_t lastAllowedReplica) { //CP Code
         meta.isClient = 1;
         meta.isServer = 0;
-        /* WRITE YOUR CODE HERE */
+        
+        if(firstAllowedReplica == 167772421 && lastAllowedReplica == 167772422 ){
+            meta.srcGroup=1; //RED
+        }else if(firstAllowedReplica == 167772423 && lastAllowedReplica == 167772424){
+            meta.srcGroup=2; //BLUE
+        }
+        
     }
 
     /* Action that updates metadata with the info that the src IP does not belong to a client */
@@ -170,8 +181,13 @@ control SLBIngress(inout headers hdr,
     }
 
     /* Table that stores the mapping between dst IP and dst MAC and egress port */
-    table arpmap {
-        /* WRITE YOUR CODE HERE */
+    table arpmap {//CP Code
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        actions = {
+            set_egress_metadata;
+        }
     }
 
     /* Table that stores the info that a certain IP belongs to a client */
@@ -186,22 +202,22 @@ control SLBIngress(inout headers hdr,
     }
 
     /* Table that stores the info that a certain IP belongs to a server */
-    table ipv4_servers {
+    table ipv4_servers {//CP Code
         /* WRITE YOUR CODE HERE */
     }
 
     /* Table that stores the info about which src IP is member of which group */
-    table src_group_membership {
+    table src_group_membership {//CP Code
         /* WRITE YOUR CODE HERE */
     }
 
     /* Table that stores the info about which dst IP is member of which group */
-    table dst_group_membership {
+    table dst_group_membership {//CP Code
         /* WRITE YOUR CODE HERE */
     }
 
     /* Apply ingress workflow */
-    apply {
+    apply {//CP Code
         if (!(hdr.arp.isValid() || hdr.ipv4.isValid())) {
             drop();                                                         // drop irrelevant/invalid traffic
         }
@@ -229,18 +245,18 @@ control SLBEgress(inout headers hdr,
                   inout standard_metadata_t standard_metadata) {
 
     /* Action that rewrites the header of client-to-server packets */
-    action rewrite_client_to_server() {
+    action rewrite_client_to_server() {//CP Code
        /* WRITE YOUR CODE HERE */
     }
 
     /* Action that rewrites the header of server-to-client packets */
-    action rewrite_server_to_client() {
+    action rewrite_server_to_client() {//CP Code
        /* WRITE YOUR CODE HERE */
     }
 
     /* Apply egress workflow */
     apply {
-        if (hdr.ipv4.isValid()) {
+        if (hdr.ipv4.isValid()) {//CP Code
             /* WRITE YOUR CODE HERE */
         }
     }
