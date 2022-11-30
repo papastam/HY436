@@ -55,6 +55,6 @@ The topology of a network with parametes `c=1` and `f=2` is the following:
     (to create the topology)
     - `/pox.py openflow.discovery CloudNetController --firewall_capability=<True|False> --migration_capability=<True|False>` (to run the load balancer) (This command needs to be run from the `pox` folder)
 
-# Assignment 3 (*Simple load balancer using P4 Programming*)
+# Assignment 3 (*Simple load balancer using [P4 Switch programming language](https://opennetworking.org/p4/)*)
 
 TBW
