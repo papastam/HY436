@@ -87,7 +87,8 @@ parser SLBParser(packet_in packet,
 
     /* parser ethernet frame */
     state parse_ethernet {
-        /* WRITE YOUR CODE HERE */
+    	packet.extract(hdr.ethernet);
+    	transition accept;
     }
 
     state parse_arp {
