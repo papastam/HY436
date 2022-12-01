@@ -11,6 +11,7 @@ const bit<16> TYPE_ARP      = 0x806;
 const bit<32> serviceIP     = 0xa010203;
 const bit<48> lbMAC         = 0xa0000000001;
 
+
 /*************************************************************************
 *********************** H E A D E R S  ***********************************
 *************************************************************************/
@@ -19,6 +20,24 @@ const bit<48> lbMAC         = 0xa0000000001;
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
+
+const ip4Addr_t h1_IP = 0xa000001;  
+const ip4Addr_t h2_IP = 0xa000002;  
+const ip4Addr_t h3_IP = 0xa000003;  
+const ip4Addr_t h4_IP = 0xa000004;  
+const ip4Addr_t h5_IP = 0xa000005;  
+const ip4Addr_t h6_IP = 0xa000006;  
+const ip4Addr_t h7_IP = 0xa000007;  
+const ip4Addr_t h8_IP = 0xa000008;
+
+const ip4Addr_t h1_MAC = 0x000000000001;  
+const ip4Addr_t h2_MAC = 0x000000000002;  
+const ip4Addr_t h3_MAC = 0x000000000003;  
+const ip4Addr_t h4_MAC = 0x000000000004;  
+const ip4Addr_t h5_MAC = 0x000000000005;  
+const ip4Addr_t h6_MAC = 0x000000000006;  
+const ip4Addr_t h7_MAC = 0x000000000007;  
+const ip4Addr_t h8_MAC = 0x000000000008;  
 
 /* ethernet frame header */
 header ethernet_t {
@@ -88,7 +107,12 @@ parser SLBParser(packet_in packet,
     /* parser ethernet frame */
     state parse_ethernet {//CP Code
     	packet.extract(hdr.ethernet);
-    	transition accept;
+        transition select(hdr.ethernet.etherType){
+            0x800   : parse_ipv4;
+            0x806   : parse_arp;
+            default : accept;
+        }
+    
     }
 
     state parse_arp {
@@ -203,17 +227,33 @@ control SLBIngress(inout headers hdr,
 
     /* Table that stores the info that a certain IP belongs to a server */
     table ipv4_servers {//CP Code
-        /* WRITE YOUR CODE HERE */
+        key = {
+            hdr.ipv4.srcAddr: lpm;
+        }
+        actions = {
+            set_server_metadata;
+            unset_server_metadata;
+        }
     }
 
     /* Table that stores the info about which src IP is member of which group */
     table src_group_membership {//CP Code
-        /* WRITE YOUR CODE HERE */
+        key = {
+            hdr.ipv4.srcAddr: lpm;
+        }
+        actions = {
+            set_src_membership;
+        }
     }
 
     /* Table that stores the info about which dst IP is member of which group */
     table dst_group_membership {//CP Code
-        /* WRITE YOUR CODE HERE */
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        actions = {
+            set_dst_membership;
+        }
     }
 
     /* Apply ingress workflow */
@@ -222,7 +262,9 @@ control SLBIngress(inout headers hdr,
             drop();                                                         // drop irrelevant/invalid traffic
         }
         else if (hdr.arp.isValid() && hdr.arp.opCode == 1) {                // handle incoming ARP requests
-            /* WRITE YOUR CODE HERE */
+            // arp_request_to_reply( lb , macAddr_t dstMAC, ip4Addr_t srcIP, ip4Addr_t dstIP) 
+            arp_request_to_reply( lbMAC, hdr.ethernet.srcAddr, serviceIP, hdr.arp.protoSrcAddr); 
+            arpmap.apply();
         }
         else if (hdr.ipv4.isValid()) {
             /* WRITE YOUR CODE HERE */
@@ -246,18 +288,29 @@ control SLBEgress(inout headers hdr,
 
     /* Action that rewrites the header of client-to-server packets */
     action rewrite_client_to_server() {//CP Code
-       /* WRITE YOUR CODE HERE */
+        if (meta.dstGroup==1){
+            hdr.ethernet.dstAddr    =h5_MAC;
+            hdr.ipv4.dstAddr        =h5_IP;
+        }else if(meta.dstGroup==2){
+            hdr.ethernet.dstAddr    =h7_MAC;
+            hdr.ipv4.dstAddr        =h7_IP;
+        }
     }
 
     /* Action that rewrites the header of server-to-client packets */
     action rewrite_server_to_client() {//CP Code
-       /* WRITE YOUR CODE HERE */
+       hdr.ethernet.srcAddr = lbMAC;
+       hdr.ipv4.srcAddr     = serviceIP;
     }
 
     /* Apply egress workflow */
     apply {
         if (hdr.ipv4.isValid()) {//CP Code
-            /* WRITE YOUR CODE HERE */
+            if(meta.isClient){
+                rewrite_client_to_server();
+            }else if(meta.isServer){
+                rewrite_server_to_client();
+            }
         }
     }
 }
