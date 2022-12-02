@@ -1,10 +1,11 @@
-*/local/*
-*/pox/*
+# Directories
+local/
+pox/
 build/
-pox/*
-*/sync.sh
-*/workspace.sh
-*pox*
-*vscode*
+pox/
+.vscode/
+
+# Filetypes
 *.ova
-*Makefile
+*.sh
+Makefile
