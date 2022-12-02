@@ -172,11 +172,14 @@ control SLBIngress(inout headers hdr,
         
         if(firstAllowedReplica == 0x0a000105 && lastAllowedReplica == 0x0a000106 ){
             meta.srcGroup=1; //RED
-            hdr.ipv4.dstAddr        =h5_IP;
         }else if(firstAllowedReplica == 0x0a000107 && lastAllowedReplica == 0x0a000108){
             meta.srcGroup=2; //BLUE
-            hdr.ipv4.dstAddr        =h7_IP;
         }
+
+        ip4Addr_t chosen_server;
+        random<int>(chosen_server,firstAllowedReplica,lastAllowedReplica);
+        hdr.ipv4.dstAddr = chosen_server;
+
         
     }
 
