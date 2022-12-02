@@ -170,10 +170,12 @@ control SLBIngress(inout headers hdr,
         meta.isClient = 1;
         meta.isServer = 0;
         
-        if(firstAllowedReplica == 167772421 && lastAllowedReplica == 167772422 ){
+        if(firstAllowedReplica == 0x0a000105 && lastAllowedReplica == 0x0a000106 ){
             meta.srcGroup=1; //RED
-        }else if(firstAllowedReplica == 167772423 && lastAllowedReplica == 167772424){
+            hdr.ipv4.dstAddr        =h5_IP;
+        }else if(firstAllowedReplica == 0x0a000107 && lastAllowedReplica == 0x0a000108){
             meta.srcGroup=2; //BLUE
+            hdr.ipv4.dstAddr        =h5_IP;
         }
         
     }
@@ -290,10 +292,10 @@ control SLBEgress(inout headers hdr,
     action rewrite_client_to_server() {//CP Code
         if (meta.dstGroup==1){
             hdr.ethernet.dstAddr    =h5_MAC;
-            hdr.ipv4.dstAddr        =h5_IP;
+            // hdr.ipv4.dstAddr        =h5_IP;
         }else if(meta.dstGroup==2){
             hdr.ethernet.dstAddr    =h7_MAC;
-            hdr.ipv4.dstAddr        =h7_IP;
+            // hdr.ipv4.dstAddr        =h7_IP;
         }
     }
 
