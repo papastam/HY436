@@ -269,7 +269,12 @@ control SLBIngress(inout headers hdr,
             arpmap.apply();
         }
         else if (hdr.ipv4.isValid()) {
-            /* WRITE YOUR CODE HERE */
+            ipv4_clients.apply();
+            ipv4_servers.apply();
+
+            src_group_membership.apply();
+            dst_group_membership.apply();
+
             if (!((meta.isClient == 1) || meta.isServer == 1) || meta.srcGroup != meta.dstGroup) {
                 drop();                                                     // drop if not coming from client or server
             }                                                               // of if the src/dst groups differ
