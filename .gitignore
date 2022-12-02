@@ -2,6 +2,8 @@
 local/
 pox/
 build/
+logs/
+pcaps/
 pox/
 .vscode/
 
