@@ -299,9 +299,9 @@ control SLBEgress(inout headers hdr,
     /* Action that rewrites the header of client-to-server packets */
     action rewrite_client_to_server() {//CP Code
         if (meta.dstGroup==1){
-            hdr.ethernet.dstAddr    =h5_MAC;
+            hdr.ethernet.dstAddr    = meta.dstMAC;
         }else if(meta.dstGroup==2){
-            hdr.ethernet.dstAddr    =h7_MAC;
+            hdr.ethernet.dstAddr    = meta.dstMAC;
         }
     }
 
