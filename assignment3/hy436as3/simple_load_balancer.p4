@@ -175,7 +175,7 @@ control SLBIngress(inout headers hdr,
             hdr.ipv4.dstAddr        =h5_IP;
         }else if(firstAllowedReplica == 0x0a000107 && lastAllowedReplica == 0x0a000108){
             meta.srcGroup=2; //BLUE
-            hdr.ipv4.dstAddr        =h5_IP;
+            hdr.ipv4.dstAddr        =h7_IP;
         }
         
     }
@@ -265,7 +265,7 @@ control SLBIngress(inout headers hdr,
         }
         else if (hdr.arp.isValid() && hdr.arp.opCode == 1) {                // handle incoming ARP requests
             // arp_request_to_reply( lb , macAddr_t dstMAC, ip4Addr_t srcIP, ip4Addr_t dstIP) 
-            arp_request_to_reply( lbMAC, hdr.ethernet.srcAddr, hdr.arp.protoSrcAddr, hdr.arp.protoSrcAddr); 
+            arp_request_to_reply( lbMAC, hdr.ethernet.srcAddr, hdr.arp.protoDstAddr, hdr.arp.protoSrcAddr); 
             arpmap.apply();
         }
         else if (hdr.ipv4.isValid()) {
@@ -297,16 +297,15 @@ control SLBEgress(inout headers hdr,
     action rewrite_client_to_server() {//CP Code
         if (meta.dstGroup==1){
             hdr.ethernet.dstAddr    =h5_MAC;
-            // hdr.ipv4.dstAddr        =h5_IP;
         }else if(meta.dstGroup==2){
             hdr.ethernet.dstAddr    =h7_MAC;
-            // hdr.ipv4.dstAddr        =h7_IP;
         }
     }
 
     /* Action that rewrites the header of server-to-client packets */
     action rewrite_server_to_client() {//CP Code
        hdr.ethernet.srcAddr = lbMAC;
+       hdr.ethernet.dstAddr = meta.dstMAC;
        hdr.ipv4.srcAddr     = serviceIP;
     }
 
