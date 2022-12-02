@@ -155,7 +155,7 @@ control SLBIngress(inout headers hdr,
         hdr.arp.hwDstAddr       = dstMAC;
         hdr.arp.protoDstAddr    = dstIP;
         hdr.arp.protoSrcAddr    = srcIP;
-
+        
         standard_metadata.egress_spec = standard_metadata.ingress_port; // the reply should be sent out of the in-port
     }
 
@@ -265,7 +265,7 @@ control SLBIngress(inout headers hdr,
         }
         else if (hdr.arp.isValid() && hdr.arp.opCode == 1) {                // handle incoming ARP requests
             // arp_request_to_reply( lb , macAddr_t dstMAC, ip4Addr_t srcIP, ip4Addr_t dstIP) 
-            arp_request_to_reply( lbMAC, hdr.ethernet.srcAddr, serviceIP, hdr.arp.protoSrcAddr); 
+            arp_request_to_reply( lbMAC, hdr.ethernet.srcAddr, hdr.arp.protoSrcAddr, hdr.arp.protoSrcAddr); 
             arpmap.apply();
         }
         else if (hdr.ipv4.isValid()) {
