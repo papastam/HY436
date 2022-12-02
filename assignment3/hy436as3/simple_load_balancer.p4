@@ -21,23 +21,23 @@ typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
-const ip4Addr_t h1_IP = 0xa000001;  
-const ip4Addr_t h2_IP = 0xa000002;  
-const ip4Addr_t h3_IP = 0xa000003;  
-const ip4Addr_t h4_IP = 0xa000004;  
-const ip4Addr_t h5_IP = 0xa000005;  
-const ip4Addr_t h6_IP = 0xa000006;  
-const ip4Addr_t h7_IP = 0xa000007;  
-const ip4Addr_t h8_IP = 0xa000008;
+const ip4Addr_t h1_IP = 0xa000101;  
+const ip4Addr_t h2_IP = 0xa000102;  
+const ip4Addr_t h3_IP = 0xa000103;  
+const ip4Addr_t h4_IP = 0xa000104;  
+const ip4Addr_t h5_IP = 0xa000105;  
+const ip4Addr_t h6_IP = 0xa000106;  
+const ip4Addr_t h7_IP = 0xa000107;  
+const ip4Addr_t h8_IP = 0xa000108;
 
-const ip4Addr_t h1_MAC = 0x000000000001;  
-const ip4Addr_t h2_MAC = 0x000000000002;  
-const ip4Addr_t h3_MAC = 0x000000000003;  
-const ip4Addr_t h4_MAC = 0x000000000004;  
-const ip4Addr_t h5_MAC = 0x000000000005;  
-const ip4Addr_t h6_MAC = 0x000000000006;  
-const ip4Addr_t h7_MAC = 0x000000000007;  
-const ip4Addr_t h8_MAC = 0x000000000008;  
+const macAddr_t h1_MAC = 0x000000000101;  
+const macAddr_t h2_MAC = 0x000000000102;  
+const macAddr_t h3_MAC = 0x000000000103;  
+const macAddr_t h4_MAC = 0x000000000104;  
+const macAddr_t h5_MAC = 0x000000000105;  
+const macAddr_t h6_MAC = 0x000000000106;  
+const macAddr_t h7_MAC = 0x000000000107;  
+const macAddr_t h8_MAC = 0x000000000108;  
 
 /* ethernet frame header */
 header ethernet_t {
@@ -308,9 +308,9 @@ control SLBEgress(inout headers hdr,
     /* Apply egress workflow */
     apply {
         if (hdr.ipv4.isValid()) {//CP Code
-            if(meta.isClient){
+            if(meta.isClient==1){
                 rewrite_client_to_server();
-            }else if(meta.isServer){
+            }else if(meta.isServer==1){
                 rewrite_server_to_client();
             }
         }
