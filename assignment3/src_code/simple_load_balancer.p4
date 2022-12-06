@@ -21,24 +21,6 @@ typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
-const ip4Addr_t h1_IP = 0xa000101;  
-const ip4Addr_t h2_IP = 0xa000102;  
-const ip4Addr_t h3_IP = 0xa000103;  
-const ip4Addr_t h4_IP = 0xa000104;  
-const ip4Addr_t h5_IP = 0xa000105;  
-const ip4Addr_t h6_IP = 0xa000106;  
-const ip4Addr_t h7_IP = 0xa000107;  
-const ip4Addr_t h8_IP = 0xa000108;
-
-const macAddr_t h1_MAC = 0x000000000101;  
-const macAddr_t h2_MAC = 0x000000000102;  
-const macAddr_t h3_MAC = 0x000000000103;  
-const macAddr_t h4_MAC = 0x000000000104;  
-const macAddr_t h5_MAC = 0x000000000105;  
-const macAddr_t h6_MAC = 0x000000000106;  
-const macAddr_t h7_MAC = 0x000000000107;  
-const macAddr_t h8_MAC = 0x000000000108;  
-
 /* ethernet frame header */
 header ethernet_t {
     macAddr_t   dstAddr;
@@ -299,9 +281,9 @@ control SLBEgress(inout headers hdr,
     /* Action that rewrites the header of client-to-server packets */
     action rewrite_client_to_server() {//CP Code
         if (meta.dstGroup==1){
-            hdr.ethernet.dstAddr    =h5_MAC;
+            hdr.ethernet.dstAddr    = meta.dstMAC;
         }else if(meta.dstGroup==2){
-            hdr.ethernet.dstAddr    =h7_MAC;
+            hdr.ethernet.dstAddr    = meta.dstMAC;
         }
     }
 

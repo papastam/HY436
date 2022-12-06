@@ -6,6 +6,7 @@ logs/
 pcaps/
 pox/
 .vscode/
+turnin_*/
 
 # Filetypes
 *.ova
