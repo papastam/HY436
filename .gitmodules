@@ -1,0 +1,3 @@
+[submodule "assignment4/artemis"]
+	path = assignment4/artemis
+	url = https://github.com/FORTH-ICS-INSPIRE/artemis
