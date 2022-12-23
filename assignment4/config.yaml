@@ -1,0 +1,40 @@
+#
+# ARTEMIS Configuration File (HY436 Assignment4)
+#
+# Start of Prefix Definitions
+prefixes:
+  sdn_assignment4: &sdn_assignment4
+  - 184.164.247.0/24
+# End of Prefix Definitions
+
+# Start of ASN Definitions
+asns:
+  sdn_assignment4_asn: &sdn_assignment4_asn
+  - 61574
+  sdn_assignment4_neighbor: &sdn_assignment4_neighbor
+  - 47065
+# End of ASN Definitions
+
+# Start of Monitor Definitions
+monitors:
+  riperis: ['']
+  bgpstreamlive:
+  - routeviews
+  - ris
+  bgpstreamkafka:
+    host: bmp.bgpstream.caida.org
+    port: 9092
+    topic: '^openbmp\.router--.+\.peer-as--.+\.bmp_raw'
+  bgpstreamhist: '/etc/artemis/'
+# End of Monitor Definitions
+
+# Start of Rule Definitions
+rules:
+- prefixes:
+  - *sdn_assignment4
+  origin_asns:
+  - *sdn_assignment4_asn
+  neighbors:
+  - *sdn_assignment4_neighbor
+  mitigation: manual
+# End of Rule Definitions
