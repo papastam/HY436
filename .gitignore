@@ -12,3 +12,6 @@ turnin_*/
 *.ova
 *.sh
 # Makefile
+
+# Files
+assignment4/advert_data.json
